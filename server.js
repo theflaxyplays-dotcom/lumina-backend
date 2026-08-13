@@ -20,9 +20,8 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Helper to extract city from prompt
 function extractCity(prompt = '') {
-  let city = 'Bhopal'; // Default location
+  let city = 'Bhopal';
   const clean = prompt.trim();
   const patterns = [
     /weather (?:in|for|of)?\s*([a-zA-Z]+)/i,
@@ -41,9 +40,9 @@ function extractCity(prompt = '') {
   return city;
 }
 
-// Router Task Classifier
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
+  if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
   if (/\b(youtube|video|play on youtube)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify|song|music|playlist|play on spotify)\b/i.test(prompt)) return 'spotify';
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
@@ -53,20 +52,36 @@ function classifyRoute(payload) {
   return 'groq';
 }
 
-// Main AI Processor
 async function processQuery(payload) {
   const prompt = payload.prompt || 'Hello';
   const provider = classifyRoute(payload);
 
   try {
-    // 1. YOUTUBE ENGINE
+    // 1. DIRECT TELEGRAM DISPATCHER
+    if (provider === 'telegram') {
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+      if (token && chatId) {
+        try {
+          await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+            chat_id: chatId.trim(),
+            text: `[LUMINA AI ALERT]: Hello! Lumina AI Assistant has successfully sent a live notification alert to your Telegram!`
+          });
+          return { provider: 'telegram', text: '✅ [TELEGRAM ENGINE]: Live notification alert sent successfully to your Telegram bot @Ai_luminaa_bot!', success: true };
+        } catch (e) {
+          return { provider: 'telegram', text: 'Telegram API Error: ' + e.message, success: false };
+        }
+      }
+    }
+
+    // 2. YOUTUBE ENGINE
     if (provider === 'youtube') {
       const query = prompt.replace(/\b(play|youtube|video|on|search|find)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Playing "${query}" on YouTube. Direct Link: ${ytUrl}`, url: ytUrl, success: true };
     }
 
-    // 2. SPOTIFY ENGINE
+    // 3. SPOTIFY ENGINE
     if (provider === 'spotify') {
       const query = prompt.replace(/\b(play|spotify|music|song|on|playlist)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
@@ -82,7 +97,7 @@ async function processQuery(payload) {
       return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${query}" on Spotify. Direct Link: ${spUrl}`, url: spUrl, success: true };
     }
 
-    // 3. WEATHER ENGINE (ANY LOCATION)
+    // 4. WEATHER ENGINE (ANY LOCATION)
     if (provider === 'weather') {
       if (process.env.OPEN_WEATHER_API_KEY) {
         try {
@@ -107,7 +122,7 @@ async function processQuery(payload) {
       }
     }
 
-    // 4. GROQ FAST CHAT ENGINE
+    // 5. GROQ FAST CHAT ENGINE
     if (process.env.GROQ_API_KEY) {
       try {
         const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -122,25 +137,12 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 5. NVIDIA NIM GPU ENGINE
-    if (process.env.NVIDIA_API_KEY) {
-      try {
-        const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-          model: 'meta/llama-3.1-70b-instruct',
-          messages: [{ role: 'system', content: 'You are Lumina AI Assistant powered by NVIDIA GPU.' }, { role: 'user', content: prompt }],
-          temperature: 0.5
-        }, { headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` } });
-        return { provider: 'nvidia', text: res.data.choices[0].message.content, success: true };
-      } catch (e) {}
-    }
-
     return { provider: 'lumina', text: `Lumina: Executed command "${prompt}".`, success: true };
   } catch (err) {
-    return { provider: 'lumina', text: `Lumina AI Response to "${prompt}": Main aapki kya madad kar sakta hoon?`, success: true };
+    return { provider: 'lumina', text: `Lumina AI Response: Main aapki kya madad kar sakta hoon?`, success: true };
   }
 }
 
-// API Endpoints
 app.get('/health', (req, res) => res.json({ status: 'ONLINE', timestamp: new Date().toISOString() }));
 
 app.post('/api/chat', async (req, res) => {
@@ -148,19 +150,15 @@ app.post('/api/chat', async (req, res) => {
   res.json(result);
 });
 
-app.post('/api/extract-repo', async (req, res) => {
-  res.json({ success: true, repository: req.body.repoUrl, message: 'Code extracted and adapted into Lumina module successfully.' });
-});
-
 app.post('/api/self-evolve', async (req, res) => {
   const prompt = req.body.prompt || 'New Feature';
-  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (telegramToken && chatId) {
+  if (token && chatId) {
     try {
-      await axios.post(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
-        chat_id: chatId,
+      await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+        chat_id: chatId.trim(),
         text: `[LUMINA SELF-EVOLVING ALERT]: New feature dynamically created for prompt: "${prompt}"`
       });
     } catch (e) {}
