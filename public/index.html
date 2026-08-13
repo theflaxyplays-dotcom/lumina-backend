@@ -33,7 +33,7 @@
 
   <header>
     <h1>LUMINA AI</h1>
-    <div class="subtitle">NEURAL NETWORK // SELF-EVOLVING</div>
+    <div class="subtitle">NEURAL NETWORK // DIRECT AUTOMATION</div>
   </header>
 
   <div class="sphere-container">
@@ -79,14 +79,16 @@
         const data = await res.json();
         const text = data.text || 'Command executed successfully.';
         
-        if (data.url) {
-          output.innerHTML = `${text}<br><br><a href="${data.url}" target="_blank" style="color:#00F0FF; font-weight:bold;">OPEN LINK ➔</a>`;
-        } else {
-          output.innerText = text;
-        }
-
+        output.innerText = text;
         sphereStatus.innerText = 'SPEAKING';
         
+        // AUTOMATIC DIRECT OPENING (NO BUTTON CLICK NEEDED!)
+        if (data.url) {
+          setTimeout(() => {
+            window.location.href = data.url;
+          }, 600);
+        }
+
         if ('speechSynthesis' in window) {
           const speech = new SpeechSynthesisUtterance(text);
           speech.onend = () => { sphereStatus.innerText = 'READY'; };
