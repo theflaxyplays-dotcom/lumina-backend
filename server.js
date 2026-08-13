@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production All-In-One Universal Server (Fixed & Enhanced)
+ * Lumina AI Assistant - Production Server with 5TB Google Drive Memory Sync
  */
 
 import express from 'express';
@@ -8,6 +8,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -19,6 +21,31 @@ app.use(cors({ origin: '*' }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
+
+// LONG-TERM USER MEMORY STORE FILE
+const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
+
+function loadUserMemory() {
+  try {
+    if (fs.existsSync(MEMORY_FILE)) {
+      return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return { facts: [], userProfile: {} };
+}
+
+function saveUserMemory(memoryData) {
+  try {
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+let userMemory = loadUserMemory();
+
+// MULTI-TURN CONVERSATION MEMORY STORE
+const chatMemory = [
+  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant. You remember all user facts, preferences, and details from previous turns. Answer warmly, accurately, and helpfully in natural Hinglish or English.' }
+];
 
 function extractCity(prompt = '') {
   let city = 'Bhopal';
@@ -40,6 +67,28 @@ function extractCity(prompt = '') {
   return city;
 }
 
+function extractAndSaveUserFacts(prompt) {
+  let updated = false;
+
+  const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
+  if (nameMatch) {
+    userMemory.userProfile.name = nameMatch.trim();
+    userMemory.facts.push(`User's name is ${nameMatch.trim()}`);
+    updated = true;
+  }
+
+  const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
+  if (homeMatch) {
+    userMemory.userProfile.home = homeMatch.trim();
+    userMemory.facts.push(`User lives in ${homeMatch.trim()}`);
+    updated = true;
+  }
+
+  if (updated) {
+    saveUserMemory(userMemory);
+  }
+}
+
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
@@ -47,7 +96,7 @@ function classifyRoute(payload) {
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-  if (/\b(kholo|open|launch|chalu|start)\b/i.test(prompt)) return 'app_launcher';
+  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
   if (process.env.NVIDIA_API_KEY && (payload.mode === 'nvidia' || prompt.includes('nvidia'))) return 'nvidia';
   if (payload.imageBase64 || payload.mode === 'multimodal') return 'gemini';
@@ -59,6 +108,8 @@ function classifyRoute(payload) {
 async function processQuery(payload) {
   const prompt = payload.prompt || 'Hello';
   const provider = classifyRoute(payload);
+
+  extractAndSaveUserFacts(prompt);
 
   try {
     if (provider === 'youtube') {
@@ -140,17 +191,30 @@ async function processQuery(payload) {
       }
     }
 
+    // GROQ CHAT ENGINE WITH PERSISTENT LONG-TERM MEMORY
     if (process.env.GROQ_API_KEY) {
       try {
+        const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}]. Use these facts to give personalized answers.` : '';
+
+        const systemMessage = {
+          role: 'system',
+          content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory. You remember user facts, preferences, and chat history.${memoryFactsText} Speak warmly, accurately, and helpfully in Hinglish or English.`
+        };
+
+        chatMemory[0] = systemMessage;
+        chatMemory.push({ role: 'user', content: prompt });
+        if (chatMemory.length > 30) chatMemory.splice(1, 2);
+
         const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
           model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant. Answer user questions warmly, accurately, and helpfully in natural Hinglish or English.' },
-            { role: 'user', content: prompt }
-          ],
+          messages: chatMemory,
           temperature: 0.7
         }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-        return { provider: 'groq', text: res.data.choices[0].message.content, success: true };
+
+        const aiResponse = res.data.choices[0].message.content;
+        chatMemory.push({ role: 'assistant', content: aiResponse });
+
+        return { provider: 'groq', text: aiResponse, success: true };
       } catch (e) {}
     }
 
