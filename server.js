@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production Universal Backend Server
+ * Lumina AI Assistant - Production Universal Server with Torch & Hardware Automation
  */
 
 import express from 'express';
@@ -78,7 +78,6 @@ function extractAndSaveUserFacts(prompt) {
   if (updated) saveUserMemory(userMemory);
 }
 
-// EXACT TIMER PARSER
 function parseDelayMs(prompt = '') {
   let delayMinutes = 0;
   const m = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i);
@@ -95,16 +94,32 @@ function parseDelayMs(prompt = '') {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
+  // 1. TORCH / FLASHLIGHT ROUTE
+  if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
+
+  // 2. PHONE CALL & DIALER ROUTE
   if (/\b(call|dial|dialer|phone|number)\b/i.test(prompt) || /\d{10}/.test(prompt)) return 'app_launcher';
+
+  // 3. TELEGRAM ALERT ROUTE
   if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
+
+  // 4. YOUTUBE MUSIC & VIDEO SEARCH ROUTE
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
+
+  // 5. SPOTIFY MUSIC ROUTE
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
+
+  // 6. PLAY STORE DOWNLOAD ROUTE
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
+
+  // 7. APP LAUNCHER ROUTE
   if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
+
+  // 8. WEATHER ROUTE
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
+
+  // 9. TAVILY LIVE WEB SEARCH ROUTE
   if (/\b(news|latest|search|score|match|today|aaj ki|cricket|stock|market|price)\b/i.test(prompt)) return 'tavily';
-  if (process.env.NVIDIA_API_KEY && (payload.mode === 'nvidia' || prompt.includes('nvidia') || prompt.includes('deep reasoning'))) return 'nvidia';
-  if (payload.imageBase64 || payload.mode === 'multimodal') return 'gemini';
 
   return 'groq';
 }
@@ -116,6 +131,19 @@ async function processQuery(payload) {
   extractAndSaveUserFacts(prompt);
 
   try {
+    // 1. TORCH / FLASHLIGHT CONTROLLER
+    if (provider === 'torch') {
+      const p = prompt.toLowerCase();
+      const turnOn = !p.includes('off') && !p.includes('band');
+      return {
+        provider: 'hardware',
+        text: `[DEVICE HARDWARE]: Flashlight Torch ${turnOn ? 'ON' : 'OFF'} kar diya gaya hai!`,
+        action: turnOn ? 'torch_on' : 'torch_off',
+        success: true
+      };
+    }
+
+    // 2. APP LAUNCHER & PHONE CALL DIALER ENGINE
     if (provider === 'app_launcher') {
       let appName = 'Phone Dialer';
       let appUrl = 'tel:';
@@ -135,6 +163,7 @@ async function processQuery(payload) {
       else if (p.includes('gallery') || p.includes('photos')) { appName = 'Photos / Gallery'; appUrl = 'https://photos.google.com'; }
       else if (p.includes('map') || p.includes('location')) { appName = 'Google Maps'; appUrl = 'https://maps.google.com'; }
       else if (p.includes('gmail') || p.includes('mail')) { appName = 'Gmail'; appUrl = 'https://mail.google.com'; }
+      else if (p.includes('data') || p.includes('internet') || p.includes('wifi')) { appName = 'Mobile Data & Connections'; appUrl = 'intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end'; }
       else if (p.includes('chrome') || p.includes('browser')) { appName = 'Chrome'; appUrl = 'https://www.google.com'; }
       else if (p.includes('play store') || p.includes('store')) { appName = 'Play Store'; appUrl = 'https://play.google.com'; }
       else if (p.includes('termux')) { appName = 'Termux'; appUrl = 'https://f-droid.org/packages/com.termux/'; }
@@ -154,27 +183,21 @@ async function processQuery(payload) {
       };
     }
 
+    // 3. YOUTUBE MUSIC & VIDEO SEARCH ENGINE
     if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
       return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`, url: ytUrl, success: true };
     }
 
+    // 4. SPOTIFY MUSIC ENGINE
     if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
-      if (process.env.SPOTIFY_ACCESS_TOKEN) {
-        try {
-          const res = await axios.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(cleanQuery)}&type=track&limit=1`, {
-            headers: { Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN.trim()}` }
-          });
-          const track = res.data.tracks?.items[0];
-          if (track) return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${track.name}" by ${track.artists[0].name} on Spotify...`, url: track.external_urls.spotify, success: true };
-        } catch (e) {}
-      }
       return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`, url: spUrl, success: true };
     }
 
+    // 5. PLAY STORE DOWNLOADER
     if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
@@ -182,6 +205,7 @@ async function processQuery(payload) {
       return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
     }
 
+    // 6. TELEGRAM BOT DISPATCHER
     if (provider === 'telegram') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -218,6 +242,7 @@ async function processQuery(payload) {
       }
     }
 
+    // 7. LIVE WEATHER ENGINE
     if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -242,38 +267,13 @@ async function processQuery(payload) {
       }
     }
 
-    if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
-      try {
-        const searchRes = await axios.post('https://api.tavily.com/search', {
-          api_key: process.env.TAVILY_API_KEY.trim(),
-          query: prompt,
-          search_depth: 'basic',
-          include_answer: true
-        });
-
-        const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
-
-        if (process.env.GROQ_API_KEY && liveFacts) {
-          const synthRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately in Hinglish.' },
-              { role: 'user', content: `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}` }
-            ],
-            temperature: 0.6
-          }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-
-          return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.data.choices[0].message.content}`, success: true };
-        }
-      } catch (e) {}
-    }
-
+    // 8. GROQ CHAT ENGINE
     if (process.env.GROQ_API_KEY) {
       const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
 
       const systemMessage = {
         role: 'system',
-        content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText} You can open apps (WhatsApp, YouTube, Spotify, Camera, Gallery, Maps, Phone Dialer, Termux, Free Fire), make phone calls, fetch live weather, play songs, send Telegram alerts, and search the live web. Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
+        content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, hardware controls (Flashlight Torch), and live device automation tools.${memoryFactsText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
       };
 
       chatMemory[0] = systemMessage;
@@ -294,17 +294,7 @@ async function processQuery(payload) {
 
     return { provider: 'lumina', text: `Lumina: Executed command "${prompt}".`, success: true };
   } catch (err) {
-    if (process.env.GROQ_API_KEY) {
-      try {
-        const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: 'You are Lumina AI Assistant.' }, { role: 'user', content: prompt }]
-        }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-        return { provider: 'groq', text: res.data.choices[0].message.content, success: true };
-      } catch (e) {}
-    }
-
-    return { provider: 'lumina', text: `Lumina: Processing "${prompt}".`, success: true };
+    return { provider: 'lumina', text: `Lumina AI Response: Main aapki kya madad kar sakta hoon?`, success: true };
   }
 }
 
@@ -325,16 +315,13 @@ app.post('/api/self-evolve', async (req, res) => {
   if (token && chatId) {
     if (delayMs > 0) {
       const mins = Math.round(delayMs / 60000);
-      console.log(`[ALARM SCHEDULED]: Triggering Telegram alert after ${mins} minute(s) (${delayMs} ms).`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
             text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${mins} Minute Alarm Timer Up! Reminder: "${prompt}"`
           });
-        } catch (e) {
-          console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
-        }
+        } catch (e) {}
       }, delayMs);
 
       return res.json({
