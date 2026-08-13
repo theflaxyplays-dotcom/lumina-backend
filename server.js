@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production Bug-Free Server
+ * Lumina AI Assistant - Production Server with Smart Delay Timer Engine
  */
 
 import express from 'express';
@@ -41,7 +41,6 @@ const chatMemory = [
   { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with persistent long-term memory. Speak warmly, accurately, and helpfully in Hinglish or English.' }
 ];
 
-// FIXED CITY EXTRACTOR
 function extractCity(prompt = '') {
   const p = prompt.toLowerCase();
   if (p.includes('nepanagar') || p.includes('nepa')) return 'Nepanagar';
@@ -166,7 +165,6 @@ async function processQuery(payload) {
       }
     }
 
-    // WEATHER ENGINE (OPENWEATHER + TAVILY LIVE WEB SEARCH + GROQ AI)
     if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -189,23 +187,8 @@ async function processQuery(payload) {
           if (res.data.answer) return { provider: 'weather', text: `[LUMINA LIVE WEATHER]: ${res.data.answer}`, success: true };
         } catch (e) {}
       }
-
-      if (process.env.GROQ_API_KEY) {
-        try {
-          const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: 'You are Lumina AI Weather Assistant. Provide accurate, realistic weather report for Nepanagar / requested place in warm Hinglish.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.5
-          }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-          return { provider: 'weather', text: res.data.choices[0].message.content, success: true };
-        } catch (e) {}
-      }
     }
 
-    // TAVILY LIVE WEB SEARCH ENGINE
     if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -232,7 +215,6 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // GROQ CHAT ENGINE
     if (process.env.GROQ_API_KEY) {
       const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}]. Use these facts to give personalized answers.` : '';
 
@@ -259,18 +241,7 @@ async function processQuery(payload) {
 
     return { provider: 'lumina', text: `Lumina: Executed command "${prompt}".`, success: true };
   } catch (err) {
-    // Intelligent Llama 3.3 AI fallback instead of generic text
-    if (process.env.GROQ_API_KEY) {
-      try {
-        const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: 'You are Lumina AI Assistant.' }, { role: 'user', content: prompt }]
-        }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-        return { provider: 'groq', text: res.data.choices[0].message.content, success: true };
-      } catch (e) {}
-    }
-
-    return { provider: 'lumina', text: `Lumina: Processing "${prompt}".`, success: true };
+    return { provider: 'lumina', text: `Lumina AI Response: Main aapki kya madad kar sakta hoon?`, success: true };
   }
 }
 
@@ -281,21 +252,51 @@ app.post('/api/chat', async (req, res) => {
   res.json(result);
 });
 
+// DELAY TIMER SELF-EVOLVING ALARM ENGINE
 app.post('/api/self-evolve', async (req, res) => {
   const prompt = req.body.prompt || 'New Feature';
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (token && chatId) {
-    try {
-      await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
-        chat_id: chatId.trim(),
-        text: `[LUMINA SELF-EVOLVING ALERT]: New feature dynamically created for prompt: "${prompt}"`
-      });
-    } catch (e) {}
+  let delayMinutes = 0;
+  const timeMatch = prompt.match(/(?:after|in)\s+(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i);
+  if (timeMatch) {
+    const num = parseInt(timeMatch, 10);
+    const lower = prompt.toLowerCase();
+    if (lower.includes('hour')) delayMinutes = num * 60;
+    else if (lower.includes('sec')) delayMinutes = num / 60;
+    else delayMinutes = num;
   }
 
-  res.json({ success: true, message: `Yeh feature add ho gaya hai, aur kuch add karna hai? (Dynamic Feature: "${prompt}" is now active)`, prompt });
+  const delayMs = delayMinutes * 60 * 1000;
+
+  if (token && chatId) {
+    if (delayMs > 0) {
+      console.log(`[SELF-EVOLVING TIMER]: Alarm scheduled in ${delayMinutes} minutes.`);
+      setTimeout(async () => {
+        try {
+          await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+            chat_id: chatId.trim(),
+            text: `⏰ [LUMINA ALARM ALERT]: ${delayMinutes} Minute Timer Up! Reminder: "${prompt}"`
+          });
+        } catch (e) {}
+      }, delayMs);
+    } else {
+      try {
+        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+          chat_id: chatId.trim(),
+          text: `[LUMINA SELF-EVOLVING ALERT]: New feature dynamically created for prompt: "${prompt}"`
+        });
+      } catch (e) {}
+    }
+  }
+
+  const timeMsg = delayMinutes > 0 ? ` Main aapko ${delayMinutes} minute baad Telegram par alert bhej dungi.` : ' Main aapko Telegram par alert bhej rahi hoon.';
+  res.json({
+    success: true,
+    message: `Yeh feature add ho gaya hai!${timeMsg} Aur kuch add karna hai?`,
+    prompt
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
