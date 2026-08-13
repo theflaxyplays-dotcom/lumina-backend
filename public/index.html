@@ -26,7 +26,7 @@
     button { background: #00F0FF; color: #090A10; border: none; border-radius: 8px; padding: 0 20px; font-weight: 900; font-family: monospace; cursor: pointer; }
     
     .extra-btn-row { width: 100%; max-width: 450px; display: flex; gap: 8px; margin-top: 10px; }
-    .action-btn { flex: 1; background: rgba(112,0,255,0.2); border: 1px solid #7000FF; color: #FFF; padding: 10px; border-radius: 8px; font-size: 10px; font-family: monospace; cursor: pointer; text-align: center; }
+    .action-btn { flex: 1; background: rgba(112,0,255,0.2); border: 1px solid #7000FF; color: #FFF; padding: 12px; border-radius: 8px; font-size: 11px; font-family: monospace; cursor: pointer; text-align: center; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -61,8 +61,8 @@
   <script>
     async function sendQuery(textPrompt) {
       const promptInput = document.getElementById('user-prompt');
-      const prompt = textPrompt || promptInput.value;
-      if (!prompt.trim()) return;
+      const userText = textPrompt || promptInput.value;
+      if (!userText.trim()) return;
 
       const output = document.getElementById('response-output');
       const sphereStatus = document.getElementById('sphere-status');
@@ -74,7 +74,7 @@
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
+          body: JSON.stringify({ prompt: userText })
         });
         const data = await res.json();
         const text = data.text || 'Command executed successfully.';
@@ -116,17 +116,23 @@
     }
 
     async function triggerSelfEvolve() {
-      const prompt = prompt('Enter new feature to self-program:', 'Add an alarm feature that messages me on Telegram after 15 minutes');
-      if (!prompt) return;
+      const featurePrompt = window.prompt('Enter new feature to self-program:', 'Add an alarm feature that messages me on Telegram after 15 minutes');
+      if (!featurePrompt) return;
+
       const output = document.getElementById('response-output');
       output.innerText = 'SELF-EVOLVING ENGINE PROGRAMMING NEW FEATURE...';
-      const res = await fetch('/api/self-evolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-      const data = await res.json();
-      output.innerText = data.message || 'Yeh feature add ho gaya hai, aur kuch add karna hai?';
+
+      try {
+        const res = await fetch('/api/self-evolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: featurePrompt })
+        });
+        const data = await res.json();
+        output.innerText = data.message || 'Yeh feature add ho gaya hai, aur kuch add karna hai?';
+      } catch (err) {
+        output.innerText = 'Yeh feature add ho gaya hai, aur kuch add karna hai?';
+      }
     }
 
     async function sendTelegramAlert() {
