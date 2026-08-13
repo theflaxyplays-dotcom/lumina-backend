@@ -33,7 +33,7 @@
 
   <header>
     <h1>LUMINA AI</h1>
-    <div class="subtitle">NEURAL NETWORK // DIRECT AUTOMATION</div>
+    <div class="subtitle">NEURAL NETWORK // HARDWARE CONTROLLER</div>
   </header>
 
   <div class="sphere-container">
@@ -59,6 +59,30 @@
   </div>
 
   <script>
+    let torchTrack = null;
+
+    async function toggleHardwareTorch(turnOn) {
+      try {
+        if (turnOn) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          torchTrack = stream.getVideoTracks()[0];
+          await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+          return true;
+        } else {
+          if (torchTrack) {
+            torchTrack.stop();
+            torchTrack = null;
+          }
+          return true;
+        }
+      } catch (e) {
+        console.log('Torch Hardware Note:', e.message);
+      }
+      return false;
+    }
+
     async function sendQuery(textPrompt) {
       const promptInput = document.getElementById('user-prompt');
       const userText = textPrompt || promptInput.value;
@@ -82,7 +106,14 @@
         output.innerText = text;
         sphereStatus.innerText = 'SPEAKING';
         
-        // AUTOMATIC DIRECT OPENING (NO BUTTON CLICK NEEDED!)
+        // HARDWARE TORCH FLASHLIGHT EXECUTION
+        if (data.action === 'torch_on') {
+          toggleHardwareTorch(true);
+        } else if (data.action === 'torch_off') {
+          toggleHardwareTorch(false);
+        }
+
+        // AUTOMATIC DIRECT APP OPENING
         if (data.url) {
           setTimeout(() => {
             window.location.href = data.url;
@@ -118,7 +149,7 @@
     }
 
     async function triggerSelfEvolve() {
-      const featurePrompt = window.prompt('Enter new feature to self-program:', 'Add an alarm feature that messages me on Telegram after 15 minutes');
+      const featurePrompt = window.prompt('Enter new feature to self-program:', 'Add an alarm feature that messages me on Telegram after 1 minute');
       if (!featurePrompt) return;
 
       const output = document.getElementById('response-output');
