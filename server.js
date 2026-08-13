@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production Universal Backend Server
+ * Lumina AI Assistant - Production All-In-One Universal Server (Fixed & Enhanced)
  */
 
 import express from 'express';
@@ -43,34 +43,16 @@ function extractCity(prompt = '') {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
-  // 1. YOUTUBE MUSIC & VIDEO ROUTE (CHECK FIRST!)
-  if (/\b(youtube|yt)\b/i.test(prompt)) return 'youtube';
-
-  // 2. SPOTIFY MUSIC ROUTE (CHECK FIRST!)
-  if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
-
-  // 3. TELEGRAM BOT ROUTE
   if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
-
-  // 4. PLAY STORE DOWNLOAD ROUTE
+  if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
+  if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-
-  // 5. APP LAUNCHER ROUTE
-  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
-
-  // 6. WEATHER ROUTE
+  if (/\b(kholo|open|launch|chalu|start)\b/i.test(prompt)) return 'app_launcher';
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
-
-  // 7. NVIDIA AI ROUTE
   if (process.env.NVIDIA_API_KEY && (payload.mode === 'nvidia' || prompt.includes('nvidia'))) return 'nvidia';
-
-  // 8. GEMINI VISION MULTIMODAL ROUTE
   if (payload.imageBase64 || payload.mode === 'multimodal') return 'gemini';
-
-  // 9. TAVILY LIVE SEARCH ROUTE
   if (/\b(news|latest|search|score)\b/i.test(prompt)) return 'tavily';
 
-  // 10. DEFAULT GROQ CHAT
   return 'groq';
 }
 
@@ -79,55 +61,36 @@ async function processQuery(payload) {
   const provider = classifyRoute(payload);
 
   try {
-    // YOUTUBE SEARCH & PLAYBACK ENGINE
     if (provider === 'youtube') {
-      const query = prompt.replace(/\b(play|youtube|video|on|search|find|chalu|karo|song|songs|gaane|gana)\b/gi, '').trim() || 'Arijit Singh Songs';
-      const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-      return {
-        provider: 'youtube',
-        text: `[YOUTUBE ENGINE]: Searching and playing "${query}" on YouTube...`,
-        url: ytUrl,
-        success: true
-      };
+      const cleanQuery = prompt
+        .replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '')
+        .trim() || 'Arijit Singh';
+      const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
+      return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`, url: ytUrl, success: true };
     }
 
-    // SPOTIFY MUSIC ENGINE
     if (provider === 'spotify') {
-      const query = prompt.replace(/\b(play|spotify|music|song|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
-      const spUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
-      if (process.env.SPOTIFY_ACCESS_TOKEN) {
-        try {
-          const res = await axios.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
-            headers: { Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN.trim()}` }
-          });
-          const track = res.data.tracks?.items[0];
-          if (track) return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${track.name}" by ${track.artists[0].name} on Spotify...`, url: track.external_urls.spotify, success: true };
-        } catch (e) {}
-      }
-      return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${query}" on Spotify...`, url: spUrl, success: true };
+      const cleanQuery = prompt
+        .replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '')
+        .trim() || 'Arijit Singh';
+      const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
+      return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`, url: spUrl, success: true };
     }
 
-    // PLAY STORE DOWNLOAD LAUNCHER
     if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
-      return {
-        provider: 'automation',
-        text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`,
-        url: appUrl,
-        success: true
-      };
+      return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
     }
 
-    // APP LAUNCHER ENGINE
     if (provider === 'app_launcher') {
       let appName = 'YouTube';
       let appUrl = 'https://www.youtube.com';
       const p = prompt.toLowerCase();
 
-      if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'whatsapp://send'; }
-      else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'instagram://app'; }
+      if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
+      else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'https://www.instagram.com'; }
       else if (p.includes('telegram')) { appName = 'Telegram'; appUrl = 'https://t.me'; }
       else if (p.includes('free fire') || p.includes('freefire')) { appName = 'Free Fire MAX'; appUrl = 'https://play.google.com/store/apps/details?id=com.dts.freefiremax'; }
       else if (p.includes('spotify')) { appName = 'Spotify'; appUrl = 'https://open.spotify.com'; }
@@ -147,15 +110,9 @@ async function processQuery(payload) {
         appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
       }
 
-      return {
-        provider: 'automation',
-        text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`,
-        url: appUrl,
-        success: true
-      };
+      return { provider: 'automation', text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`, url: appUrl, success: true };
     }
 
-    // TELEGRAM DISPATCHER
     if (provider === 'telegram') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -172,7 +129,6 @@ async function processQuery(payload) {
       }
     }
 
-    // WEATHER ENGINE
     if (provider === 'weather') {
       if (process.env.OPEN_WEATHER_API_KEY) {
         try {
@@ -182,22 +138,8 @@ async function processQuery(payload) {
           return { provider: 'weather', text: `[LUMINA WEATHER]: Forecast for ${d.name}, ${d.sys.country}: ${d.weather[0].description}, Temp: ${d.main.temp}°C (Feels like ${d.main.feels_like}°C), Humidity: ${d.main.humidity}%, Wind: ${d.wind.speed} m/s.`, success: true };
         } catch (e) {}
       }
-      if (process.env.GROQ_API_KEY) {
-        try {
-          const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: 'You are Lumina AI Weather Assistant. Provide accurate, realistic weather report in warm Hinglish.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.5
-          }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-          return { provider: 'weather', text: res.data.choices[0].message.content, success: true };
-        } catch (e) {}
-      }
     }
 
-    // GROQ FAST CHAT ENGINE
     if (process.env.GROQ_API_KEY) {
       try {
         const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
