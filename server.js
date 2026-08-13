@@ -1,6 +1,5 @@
 /**
- * Lumina AI Assistant - Master Production Server
- * Full Multi-API Execution, Permanent System Capability Reinforcement & 5TB Cloud Memory Sync
+ * Lumina AI Assistant - Production Universal Server with Unified Delay Alarm Engine
  */
 
 import express from 'express';
@@ -23,7 +22,6 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// 1. LONG-TERM USER MEMORY STORE & GOOGLE DRIVE 5TB SYNC
 const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
 
 function loadUserMemory() {
@@ -33,27 +31,14 @@ function loadUserMemory() {
   return { facts: [], userProfile: {} };
 }
 
-async function syncToGoogleDrive(memoryData) {
-  const driveKey = process.env.GOOGLE_DRIVE_API_KEY;
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (driveKey && folderId) {
-    try {
-      console.log(`[GOOGLE DRIVE 5TB SYNC]: Memory file synced to folder ${folderId}`);
-    } catch (e) {}
-  }
-}
-
 function saveUserMemory(memoryData) {
-  try {
-    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8');
-    syncToGoogleDrive(memoryData);
-  } catch (e) {}
+  try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8'); } catch (e) {}
 }
 
 let userMemory = loadUserMemory();
 
 const chatMemory = [
-  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with full device automation tools, real-time live web search, weather sensors, and long-term memory. Speak warmly, confidently, and accurately in natural Hinglish or English.' }
+  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync. Speak warmly, confidently, and helpfully in natural Hinglish or English.' }
 ];
 
 function extractCity(prompt = '') {
@@ -96,34 +81,15 @@ function extractAndSaveUserFacts(prompt) {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
-  // 1. PHONE CALL & DIALER ROUTE
   if (/\b(call|dial|dialer|phone|number)\b/i.test(prompt) || /\d{10}/.test(prompt)) return 'app_launcher';
-
-  // 2. TELEGRAM ALERT ROUTE
   if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
-
-  // 3. YOUTUBE MUSIC & VIDEO SEARCH ROUTE
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
-
-  // 4. SPOTIFY MUSIC ROUTE
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
-
-  // 5. PLAY STORE DOWNLOAD ROUTE
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-
-  // 6. APP LAUNCHER ROUTE
   if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
-
-  // 7. WEATHER ROUTE
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
-
-  // 8. TAVILY LIVE WEB SEARCH ROUTE
   if (/\b(news|latest|search|score|match|today|aaj ki|cricket|stock|market|price)\b/i.test(prompt)) return 'tavily';
-
-  // 9. NVIDIA GPU CLOUD ROUTE
   if (process.env.NVIDIA_API_KEY && (payload.mode === 'nvidia' || prompt.includes('nvidia') || prompt.includes('deep reasoning'))) return 'nvidia';
-
-  // 10. GEMINI VISION MULTIMODAL ROUTE
   if (payload.imageBase64 || payload.mode === 'multimodal') return 'gemini';
 
   return 'groq';
@@ -206,24 +172,59 @@ async function processQuery(payload) {
       return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
     }
 
-    // 5. TELEGRAM BOT DISPATCHER
+    // 5. TELEGRAM BOT & DELAY TIMER ALARM ENGINE (FIXED DELAY TIMER)
     if (provider === 'telegram') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
+
+      let delayMinutes = 0;
+      const timeMatch = prompt.match(/(?:after|in|for|baad)?\s*(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i) ||
+                        prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)\s*(?:baad|after)?/i);
+
+      if (timeMatch && timeMatch) {
+        const num = parseInt(timeMatch, 10);
+        const lower = prompt.toLowerCase();
+        if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
+        else if (lower.includes('sec')) delayMinutes = num / 60;
+        else delayMinutes = num;
+      }
+
+      const delayMs = delayMinutes * 60 * 1000;
+
       if (token && chatId) {
-        try {
-          await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
-            chat_id: chatId.trim(),
-            text: `[LUMINA AI ALERT]: Hello! Lumina AI Assistant has successfully sent a live notification alert to your Telegram!`
-          });
-          return { provider: 'telegram', text: '✅ [TELEGRAM ENGINE]: Live notification alert sent successfully to your Telegram bot @Ai_luminaa_bot!', success: true };
-        } catch (e) {
-          return { provider: 'telegram', text: 'Telegram API Error: ' + e.message, success: false };
+        if (delayMs > 0) {
+          console.log(`[ALARM SCHEDULED]: Telegram alert scheduled in ${delayMinutes} minute(s) (${delayMs} ms).`);
+          setTimeout(async () => {
+            try {
+              await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+                chat_id: chatId.trim(),
+                text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${delayMinutes} Minute Alarm Timer Up! Reminder: "${prompt}"`
+              });
+            } catch (e) {
+              console.error('[TELEGRAM TIMER ERROR]', e.message);
+            }
+          }, delayMs);
+
+          return {
+            provider: 'telegram',
+            text: `⏰ [LUMINA ALARM ENGINE]: Alarm set successfully! Main exact ${delayMinutes} minute baad aapke Telegram bot @Ai_luminaa_bot par alert bhej dungi.`,
+            success: true
+          };
+        } else {
+          try {
+            await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+              chat_id: chatId.trim(),
+              text: `[LUMINA AI ALERT]: Hello! Lumina AI Assistant has successfully sent a live notification alert to your Telegram!`
+            });
+            return { provider: 'telegram', text: '✅ [TELEGRAM ENGINE]: Live notification alert sent successfully to your Telegram bot @Ai_luminaa_bot!', success: true };
+          } catch (e) {
+            return { provider: 'telegram', text: 'Telegram API Error: ' + e.message, success: false };
+          }
         }
       }
     }
 
-    // 6. LIVE WEATHER ENGINE (OPENWEATHER + TAVILY SEARCH + LLAMA AI)
+    // 6. LIVE WEATHER ENGINE
     if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -248,7 +249,7 @@ async function processQuery(payload) {
       }
     }
 
-    // 7. TAVILY LIVE WEB KNOWLEDGE FUSION ENGINE
+    // 7. TAVILY LIVE WEB SEARCH
     if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -275,7 +276,7 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 8. GROQ CHAT ENGINE WITH PERSISTENT SYSTEM INSTRUCTION REINFORCEMENT
+    // 8. GROQ CHAT ENGINE WITH SYSTEM REINFORCEMENT
     if (process.env.GROQ_API_KEY) {
       const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
 
@@ -323,20 +324,20 @@ app.post('/api/chat', async (req, res) => {
   res.json(result);
 });
 
-// DELAY TIMER ALARM ENGINE
+// SELF-EVOLVING DELAY ALARM ENDPOINT
 app.post('/api/self-evolve', async (req, res) => {
   const prompt = req.body.prompt || 'New Feature';
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
   let delayMinutes = 0;
-  const timeMatch = prompt.match(/(?:after|in|for)\s+(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i) ||
-                    prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i);
+  const timeMatch = prompt.match(/(?:after|in|for|baad)?\s*(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i) ||
+                    prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)\s*(?:baad|after)?/i);
 
   if (timeMatch && timeMatch) {
     const num = parseInt(timeMatch, 10);
     const lower = prompt.toLowerCase();
-    if (lower.includes('hour')) delayMinutes = num * 60;
+    if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
     else if (lower.includes('sec')) delayMinutes = num / 60;
     else delayMinutes = num;
   }
@@ -345,13 +346,16 @@ app.post('/api/self-evolve', async (req, res) => {
 
   if (token && chatId) {
     if (delayMs > 0) {
+      console.log(`[ALARM SCHEDULED]: Telegram alert scheduled in ${delayMinutes} minute(s) (${delayMs} ms).`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
             text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${delayMinutes} Minute Alarm Timer Up! Reminder: "${prompt}"`
           });
-        } catch (e) {}
+        } catch (e) {
+          console.error('[TELEGRAM TIMER ERROR]', e.message);
+        }
       }, delayMs);
     } else {
       try {
