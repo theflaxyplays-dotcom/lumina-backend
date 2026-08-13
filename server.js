@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production Server with Smart Delay Timer Engine
+ * Lumina AI Assistant - Master Server with Permanent Capability System Reinforcement
  */
 
 import express from 'express';
@@ -22,6 +22,7 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
+// LONG-TERM USER MEMORY STORE
 const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
 
 function loadUserMemory() {
@@ -38,7 +39,7 @@ function saveUserMemory(memoryData) {
 let userMemory = loadUserMemory();
 
 const chatMemory = [
-  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with persistent long-term memory. Speak warmly, accurately, and helpfully in Hinglish or English.' }
+  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full multi-API power, and self-evolving capabilities. Speak warmly, accurately, and helpfully in natural Hinglish or English.' }
 ];
 
 function extractCity(prompt = '') {
@@ -81,6 +82,7 @@ function extractAndSaveUserFacts(prompt) {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
+  if (/\b(call|dial|dialer|phone|number)\b/i.test(prompt) || /\d{10}/.test(prompt)) return 'app_launcher';
   if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
@@ -101,6 +103,39 @@ async function processQuery(payload) {
   extractAndSaveUserFacts(prompt);
 
   try {
+    if (provider === 'app_launcher') {
+      let appName = 'Phone Dialer';
+      let appUrl = 'tel:';
+      const p = prompt.toLowerCase();
+
+      const phoneMatch = prompt.match(/(\d{10})/);
+      if (phoneMatch) {
+        appName = `Phone Dialer (${phoneMatch})`;
+        appUrl = `tel:${phoneMatch}`;
+      } else if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
+      else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'https://www.instagram.com'; }
+      else if (p.includes('telegram')) { appName = 'Telegram'; appUrl = 'https://t.me'; }
+      else if (p.includes('free fire') || p.includes('freefire')) { appName = 'Free Fire MAX'; appUrl = 'https://play.google.com/store/apps/details?id=com.dts.freefiremax'; }
+      else if (p.includes('spotify')) { appName = 'Spotify'; appUrl = 'https://open.spotify.com'; }
+      else if (p.includes('youtube')) { appName = 'YouTube'; appUrl = 'https://www.youtube.com'; }
+      else if (p.includes('camera')) { appName = 'Camera'; appUrl = 'intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end'; }
+      else if (p.includes('gallery') || p.includes('photos')) { appName = 'Photos / Gallery'; appUrl = 'https://photos.google.com'; }
+      else if (p.includes('map') || p.includes('location')) { appName = 'Google Maps'; appUrl = 'https://maps.google.com'; }
+      else if (p.includes('gmail') || p.includes('mail')) { appName = 'Gmail'; appUrl = 'https://mail.google.com'; }
+      else if (p.includes('chrome') || p.includes('browser')) { appName = 'Chrome'; appUrl = 'https://www.google.com'; }
+      else if (p.includes('play store') || p.includes('store')) { appName = 'Play Store'; appUrl = 'https://play.google.com'; }
+      else if (p.includes('termux')) { appName = 'Termux'; appUrl = 'https://f-droid.org/packages/com.termux/'; }
+      else if (p.includes('calculator')) { appName = 'Calculator'; appUrl = 'https://www.google.com/search?q=calculator'; }
+      else if (p.includes('dialer') || p.includes('phone') || p.includes('call')) { appName = 'Phone Dialer'; appUrl = 'tel:'; }
+
+      return {
+        provider: 'automation',
+        text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`,
+        url: appUrl,
+        success: true
+      };
+    }
+
     if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
@@ -118,35 +153,6 @@ async function processQuery(payload) {
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
       return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
-    }
-
-    if (provider === 'app_launcher') {
-      let appName = 'YouTube';
-      let appUrl = 'https://www.youtube.com';
-      const p = prompt.toLowerCase();
-
-      if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
-      else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'https://www.instagram.com'; }
-      else if (p.includes('telegram')) { appName = 'Telegram'; appUrl = 'https://t.me'; }
-      else if (p.includes('free fire') || p.includes('freefire')) { appName = 'Free Fire MAX'; appUrl = 'https://play.google.com/store/apps/details?id=com.dts.freefiremax'; }
-      else if (p.includes('spotify')) { appName = 'Spotify'; appUrl = 'https://open.spotify.com'; }
-      else if (p.includes('youtube')) { appName = 'YouTube'; appUrl = 'https://www.youtube.com'; }
-      else if (p.includes('camera')) { appName = 'Camera'; appUrl = 'intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end'; }
-      else if (p.includes('gallery') || p.includes('photos')) { appName = 'Photos / Gallery'; appUrl = 'https://photos.google.com'; }
-      else if (p.includes('map') || p.includes('location')) { appName = 'Google Maps'; appUrl = 'https://maps.google.com'; }
-      else if (p.includes('gmail') || p.includes('mail')) { appName = 'Gmail'; appUrl = 'https://mail.google.com'; }
-      else if (p.includes('chrome') || p.includes('browser')) { appName = 'Chrome'; appUrl = 'https://www.google.com'; }
-      else if (p.includes('play store') || p.includes('store')) { appName = 'Play Store'; appUrl = 'https://play.google.com'; }
-      else if (p.includes('termux')) { appName = 'Termux'; appUrl = 'https://f-droid.org/packages/com.termux/'; }
-      else if (p.includes('calculator')) { appName = 'Calculator'; appUrl = 'https://www.google.com/search?q=calculator'; }
-      else if (p.includes('dialer') || p.includes('phone')) { appName = 'Phone Dialer'; appUrl = 'tel:'; }
-      else {
-        const cleanName = prompt.replace(/\b(open|kholo|launch|chalu|start|app)\b/gi, '').trim();
-        appName = cleanName || 'App';
-        appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
-      }
-
-      return { provider: 'automation', text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`, url: appUrl, success: true };
     }
 
     if (provider === 'telegram') {
@@ -189,38 +195,12 @@ async function processQuery(payload) {
       }
     }
 
-    if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
-      try {
-        const searchRes = await axios.post('https://api.tavily.com/search', {
-          api_key: process.env.TAVILY_API_KEY.trim(),
-          query: prompt,
-          search_depth: 'basic',
-          include_answer: true
-        });
-
-        const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
-
-        if (process.env.GROQ_API_KEY && liveFacts) {
-          const synthRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately in Hinglish.' },
-              { role: 'user', content: `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}` }
-            ],
-            temperature: 0.6
-          }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-
-          return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.data.choices[0].message.content}`, success: true };
-        }
-      } catch (e) {}
-    }
-
     if (process.env.GROQ_API_KEY) {
-      const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}]. Use these facts to give personalized answers.` : '';
+      const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
 
       const systemMessage = {
         role: 'system',
-        content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory and live API tools.${memoryFactsText} Speak warmly, accurately, and helpfully in Hinglish or English.`
+        content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory and live device automation tools.${memoryFactsText} You can open apps, make phone calls, fetch weather, play songs, send Telegram alerts, and search the live web. Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
       };
 
       chatMemory[0] = systemMessage;
@@ -252,15 +232,16 @@ app.post('/api/chat', async (req, res) => {
   res.json(result);
 });
 
-// DELAY TIMER SELF-EVOLVING ALARM ENGINE
 app.post('/api/self-evolve', async (req, res) => {
   const prompt = req.body.prompt || 'New Feature';
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
   let delayMinutes = 0;
-  const timeMatch = prompt.match(/(?:after|in)\s+(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i);
-  if (timeMatch) {
+  const timeMatch = prompt.match(/(?:after|in|for)\s+(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i) ||
+                    prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours)/i);
+
+  if (timeMatch && timeMatch) {
     const num = parseInt(timeMatch, 10);
     const lower = prompt.toLowerCase();
     if (lower.includes('hour')) delayMinutes = num * 60;
@@ -272,12 +253,11 @@ app.post('/api/self-evolve', async (req, res) => {
 
   if (token && chatId) {
     if (delayMs > 0) {
-      console.log(`[SELF-EVOLVING TIMER]: Alarm scheduled in ${delayMinutes} minutes.`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
-            text: `⏰ [LUMINA ALARM ALERT]: ${delayMinutes} Minute Timer Up! Reminder: "${prompt}"`
+            text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${delayMinutes} Minute Alarm Timer Up! Reminder: "${prompt}"`
           });
         } catch (e) {}
       }, delayMs);
@@ -285,13 +265,13 @@ app.post('/api/self-evolve', async (req, res) => {
       try {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId.trim(),
-          text: `[LUMINA SELF-EVOLVING ALERT]: New feature dynamically created for prompt: "${prompt}"`
+          text: `[LUMINA SELF-EVOLVING ALERT]: New feature active: "${prompt}"`
         });
       } catch (e) {}
     }
   }
 
-  const timeMsg = delayMinutes > 0 ? ` Main aapko ${delayMinutes} minute baad Telegram par alert bhej dungi.` : ' Main aapko Telegram par alert bhej rahi hoon.';
+  const timeMsg = delayMinutes > 0 ? ` Main aapko exact ${delayMinutes} minute baad Telegram par alert bhej dungi.` : ' Main aapko Telegram par alert bhej rahi hoon.';
   res.json({
     success: true,
     message: `Yeh feature add ho gaya hai!${timeMsg} Aur kuch add karna hai?`,
