@@ -1,5 +1,5 @@
 /**
- * Lumina AI Assistant - Production Universal Server with Unified Delay Alarm Engine
+ * Lumina AI Assistant - Production Universal Backend Server
  */
 
 import express from 'express';
@@ -78,6 +78,20 @@ function extractAndSaveUserFacts(prompt) {
   if (updated) saveUserMemory(userMemory);
 }
 
+// EXACT TIMER PARSER
+function parseDelayMs(prompt = '') {
+  let delayMinutes = 0;
+  const m = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i);
+  if (m && m) {
+    const num = parseInt(m, 10);
+    const lower = prompt.toLowerCase();
+    if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
+    else if (lower.includes('sec')) delayMinutes = num / 60;
+    else delayMinutes = num;
+  }
+  return delayMinutes * 60 * 1000;
+}
+
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
@@ -102,7 +116,6 @@ async function processQuery(payload) {
   extractAndSaveUserFacts(prompt);
 
   try {
-    // 1. APP LAUNCHER & PHONE CALL DIALER ENGINE
     if (provider === 'app_launcher') {
       let appName = 'Phone Dialer';
       let appUrl = 'tel:';
@@ -141,14 +154,12 @@ async function processQuery(payload) {
       };
     }
 
-    // 2. YOUTUBE MUSIC & VIDEO SEARCH ENGINE
     if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
       return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`, url: ytUrl, success: true };
     }
 
-    // 3. SPOTIFY MUSIC ENGINE
     if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
@@ -164,7 +175,6 @@ async function processQuery(payload) {
       return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`, url: spUrl, success: true };
     }
 
-    // 4. PLAY STORE DOWNLOADER
     if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
@@ -172,42 +182,26 @@ async function processQuery(payload) {
       return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
     }
 
-    // 5. TELEGRAM BOT & DELAY TIMER ALARM ENGINE (FIXED DELAY TIMER)
     if (provider === 'telegram') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
-
-      let delayMinutes = 0;
-      const timeMatch = prompt.match(/(?:after|in|for|baad)?\s*(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i) ||
-                        prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)\s*(?:baad|after)?/i);
-
-      if (timeMatch && timeMatch) {
-        const num = parseInt(timeMatch, 10);
-        const lower = prompt.toLowerCase();
-        if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
-        else if (lower.includes('sec')) delayMinutes = num / 60;
-        else delayMinutes = num;
-      }
-
-      const delayMs = delayMinutes * 60 * 1000;
+      const delayMs = parseDelayMs(prompt);
 
       if (token && chatId) {
         if (delayMs > 0) {
-          console.log(`[ALARM SCHEDULED]: Telegram alert scheduled in ${delayMinutes} minute(s) (${delayMs} ms).`);
+          const mins = Math.round(delayMs / 60000);
           setTimeout(async () => {
             try {
               await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
                 chat_id: chatId.trim(),
-                text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${delayMinutes} Minute Alarm Timer Up! Reminder: "${prompt}"`
+                text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${mins} Minute Alarm Timer Up! Reminder: "${prompt}"`
               });
-            } catch (e) {
-              console.error('[TELEGRAM TIMER ERROR]', e.message);
-            }
+            } catch (e) {}
           }, delayMs);
 
           return {
             provider: 'telegram',
-            text: `⏰ [LUMINA ALARM ENGINE]: Alarm set successfully! Main exact ${delayMinutes} minute baad aapke Telegram bot @Ai_luminaa_bot par alert bhej dungi.`,
+            text: `⏰ [LUMINA ALARM ENGINE]: Alarm set successfully! Main exact ${mins} minute baad aapke Telegram par alert bhej dungi.`,
             success: true
           };
         } else {
@@ -224,7 +218,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 6. LIVE WEATHER ENGINE
     if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -249,7 +242,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 7. TAVILY LIVE WEB SEARCH
     if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -276,7 +268,6 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 8. GROQ CHAT ENGINE WITH SYSTEM REINFORCEMENT
     if (process.env.GROQ_API_KEY) {
       const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
 
@@ -324,39 +315,33 @@ app.post('/api/chat', async (req, res) => {
   res.json(result);
 });
 
-// SELF-EVOLVING DELAY ALARM ENDPOINT
+// SELF-EVOLVING DELAYED ALARM ENDPOINT
 app.post('/api/self-evolve', async (req, res) => {
   const prompt = req.body.prompt || 'New Feature';
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
-
-  let delayMinutes = 0;
-  const timeMatch = prompt.match(/(?:after|in|for|baad)?\s*(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i) ||
-                    prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)\s*(?:baad|after)?/i);
-
-  if (timeMatch && timeMatch) {
-    const num = parseInt(timeMatch, 10);
-    const lower = prompt.toLowerCase();
-    if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
-    else if (lower.includes('sec')) delayMinutes = num / 60;
-    else delayMinutes = num;
-  }
-
-  const delayMs = delayMinutes * 60 * 1000;
+  const delayMs = parseDelayMs(prompt);
 
   if (token && chatId) {
     if (delayMs > 0) {
-      console.log(`[ALARM SCHEDULED]: Telegram alert scheduled in ${delayMinutes} minute(s) (${delayMs} ms).`);
+      const mins = Math.round(delayMs / 60000);
+      console.log(`[ALARM SCHEDULED]: Triggering Telegram alert after ${mins} minute(s) (${delayMs} ms).`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
-            text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${delayMinutes} Minute Alarm Timer Up! Reminder: "${prompt}"`
+            text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${mins} Minute Alarm Timer Up! Reminder: "${prompt}"`
           });
         } catch (e) {
-          console.error('[TELEGRAM TIMER ERROR]', e.message);
+          console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
         }
       }, delayMs);
+
+      return res.json({
+        success: true,
+        message: `Yeh feature add ho gaya hai! Main aapko exact ${mins} minute baad Telegram par alert bhej dungi. Aur kuch add karna hai?`,
+        prompt
+      });
     } else {
       try {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
@@ -367,10 +352,9 @@ app.post('/api/self-evolve', async (req, res) => {
     }
   }
 
-  const timeMsg = delayMinutes > 0 ? ` Main aapko exact ${delayMinutes} minute baad Telegram par alert bhej dungi.` : ' Main aapko Telegram par alert bhej rahi hoon.';
   res.json({
     success: true,
-    message: `Yeh feature add ho gaya hai!${timeMsg} Aur kuch add karna hai?`,
+    message: `Yeh feature add ho gaya hai! Main aapko Telegram par alert bhej rahi hoon. Aur kuch add karna hai?`,
     prompt
   });
 });
