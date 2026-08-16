@@ -1,5 +1,9 @@
 /**
  * Lumina AI Assistant - Production 10/10 Architecture Server
+ * Intelligent Routing:
+ *   - Coding / Deep Reasoning ➔ NVIDIA Nemotron (Auto-Detected)
+ *   - Casual / Routine Queries ➔ Groq (Llama 3.3 70B)
+ *   - Resilient Fallback Chain ➔ Groq ➔ Gemini ➔ NVIDIA
  */
 
 import express from 'express';
@@ -64,13 +68,13 @@ function extractCity(prompt = '') {
 function extractAndSaveUserFacts(prompt) {
   let updated = false;
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
-  if (nameMatch) {
+  if (nameMatch && nameMatch) {
     userMemory.userProfile.name = nameMatch.trim();
     userMemory.facts.push(`User name: ${nameMatch.trim()}`);
     updated = true;
   }
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
-  if (homeMatch) {
+  if (homeMatch && homeMatch) {
     userMemory.userProfile.home = homeMatch.trim();
     userMemory.facts.push(`User home: ${homeMatch.trim()}`);
     updated = true;
@@ -103,10 +107,103 @@ function classifyRoute(payload) {
   if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
   if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
   if (/\b(news|latest|search|score|match|today|aaj ki|cricket|stock|market|price)\b/i.test(prompt)) return 'tavily';
-  if (process.env.NVIDIA_API_KEY && (payload.mode === 'nvidia' || prompt.includes('nvidia') || prompt.includes('deep reasoning'))) return 'nvidia';
-  if (payload.imageBase64 || payload.mode === 'multimodal') return 'gemini';
 
-  return 'groq';
+  return 'llm_fallback_chain';
+}
+
+// -------------------------------------------------------------
+// INTELLIGENT MULTI-MODEL ENGINE (NVIDIA ➔ GROQ ➔ GEMINI)
+// -------------------------------------------------------------
+async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferMode = '') {
+  // Deep Reasoning & Coding Keyword Detection
+  const isCodingOrReasoning = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
+
+  const shouldPreferNvidia = preferMode === 'nvidia' || isCodingOrReasoning;
+
+  // 1. Primary for Coding & Reasoning: NVIDIA Nemotron
+  if (shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
+    try {
+      console.log('[LUMINA ENGINE] ➔ Routing to NVIDIA Nemotron for Deep Reasoning/Coding...');
+      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        messages: [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }],
+        temperature: 0.5,
+        max_tokens: 2048
+      }, {
+        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
+        timeout: 20000
+      });
+
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
+      }
+    } catch (e) {
+      console.warn('[NVIDIA API FAIL] ➔ Falling back to Groq/Gemini:', e.message);
+    }
+  }
+
+  // 2. Primary for Casual Chat & General Speed: Groq (Llama 3.3 70B)
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
+      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages: messages,
+        temperature: 0.7
+      }, {
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` },
+        timeout: 15000
+      });
+
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'groq' };
+      }
+    } catch (e) {
+      console.warn('[GROQ API FAIL/LIMIT] ➔ Switching to Gemini Fallback:', e.message);
+    }
+  }
+
+  // 3. First Fallback: Google Gemini API (gemini-1.5-flash)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+      const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
+      
+      const res = await axios.post(geminiUrl, {
+        contents: [{ parts: [{ text: geminiPrompt }] }]
+      }, { timeout: 15000 });
+
+      const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return { text: text, provider: 'gemini (fallback)' };
+      }
+    } catch (e) {
+      console.warn('[GEMINI API FAIL] ➔ Switching to NVIDIA Fallback:', e.message);
+    }
+  }
+
+  // 4. Secondary Backup: NVIDIA Nemotron (if not already triggered)
+  if (!shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
+    try {
+      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        messages: [systemMsg, { role: 'user', content: userPrompt }],
+        temperature: 0.6,
+        max_tokens: 1024
+      }, {
+        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
+        timeout: 15000
+      });
+
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'nvidia (fallback)' };
+      }
+    } catch (e) {
+      console.warn('[NVIDIA BACKUP FAIL]:', e.message);
+    }
+  }
+
+  return { text: `Lumina: Command "${userPrompt}" receive ho gaya hai.`, provider: 'lumina_local' };
 }
 
 async function processQuery(payload) {
@@ -132,7 +229,7 @@ async function processQuery(payload) {
       const p = prompt.toLowerCase();
 
       const phoneMatch = prompt.match(/(\d{10})/);
-      if (phoneMatch) {
+      if (phoneMatch && phoneMatch) {
         appName = `Phone Dialer (${phoneMatch})`;
         appUrl = `tel:${phoneMatch}`;
       } else if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
@@ -249,58 +346,33 @@ async function processQuery(payload) {
 
         const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
 
-        if (process.env.GROQ_API_KEY && liveFacts) {
-          const synthRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately in Hinglish.' },
-              { role: 'user', content: `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}` }
-            ],
-            temperature: 0.6
-          }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-
-          return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.data.choices[0].message.content}`, success: true };
+        if (liveFacts) {
+          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately in Hinglish.' };
+          const synthRes = await queryLLMWithFallback(systemMsg, `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}`, [], payload.mode);
+          return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.text}`, success: true };
         }
       } catch (e) {}
     }
 
-    if (process.env.GROQ_API_KEY) {
-      const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
+    // Default Multi-Model LLM Execution
+    const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
+    const systemMessage = {
+      role: 'system',
+      content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
+    };
 
-      const systemMessage = {
-        role: 'system',
-        content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
-      };
+    chatMemory[0] = systemMessage;
+    const llmResult = await queryLLMWithFallback(systemMessage, prompt, chatMemory, payload.mode);
 
-      chatMemory[0] = systemMessage;
-      chatMemory.push({ role: 'user', content: prompt });
-      if (chatMemory.length > 30) chatMemory.splice(1, 2);
+    chatMemory.push({ role: 'user', content: prompt });
+    chatMemory.push({ role: 'assistant', content: llmResult.text });
+    if (chatMemory.length > 30) chatMemory.splice(1, 2);
 
-      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-        model: 'llama-3.3-70b-versatile',
-        messages: chatMemory,
-        temperature: 0.7
-      }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
+    return { provider: llmResult.provider, text: llmResult.text, success: true };
 
-      const aiResponse = res.data.choices[0].message.content;
-      chatMemory.push({ role: 'assistant', content: aiResponse });
-
-      return { provider: 'groq', text: aiResponse, success: true };
-    }
-
-    return { provider: 'lumina', text: `Lumina: Executed command "${prompt}".`, success: true };
   } catch (err) {
-    if (process.env.GROQ_API_KEY) {
-      try {
-        const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: 'You are Lumina AI Assistant.' }, { role: 'user', content: prompt }]
-        }, { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` } });
-        return { provider: 'groq', text: res.data.choices[0].message.content, success: true };
-      } catch (e) {}
-    }
-
-    return { provider: 'lumina', text: `Lumina: Processing "${prompt}".`, success: true };
+    const fallbackRes = await queryLLMWithFallback({ role: 'system', content: 'You are Lumina AI Assistant.' }, prompt);
+    return { provider: fallbackRes.provider, text: fallbackRes.text, success: true };
   }
 }
 
