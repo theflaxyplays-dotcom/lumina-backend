@@ -1,7 +1,7 @@
 /**
  * Lumina AI Assistant - Production 10/10 Architecture Server
  * Features:
- *   - Telegram 2-Way Interactive Bot (Webhook Engine)
+ *   - Telegram 2-Way Interactive Bot (Webhook Engine) with 1-Tap Buttons & Photo Scan
  *   - Contact Book & Name-based Calling (e.g., "Rahul ko call lagao")
  *   - Direct WhatsApp Messaging with Pre-filled Text
  *   - Smart Persistent Notes & Reminder Memory
@@ -308,7 +308,6 @@ async function processQuery(payload) {
         targetNumber = phoneMatch[0];
         msgText = prompt.replace(phoneMatch[0], '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|par message)\b/gi, '').trim();
       } else {
-        // Search by contact name in userMemory.contacts
         const words = prompt.toLowerCase().split(/\s+/);
         for (const [contactName, num] of Object.entries(userMemory.contacts)) {
           if (prompt.toLowerCase().includes(contactName)) {
@@ -324,8 +323,9 @@ async function processQuery(payload) {
         waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
           provider: 'automation',
-          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp to send message to ${targetNumber}: "${msgText || 'Hello'}"...`,
+          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp to send message to ${targetNumber}:\n"${msgText || 'Hello'}"...`,
           url: waUrl,
+          buttonText: '💬 Open WhatsApp Chat',
           success: true
         };
       } else {
@@ -333,8 +333,9 @@ async function processQuery(payload) {
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
           provider: 'automation',
-          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp with message: "${msgText}"...`,
+          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp with message:\n"${msgText}"...`,
           url: waUrl,
+          buttonText: '💬 Open WhatsApp',
           success: true
         };
       }
@@ -350,7 +351,6 @@ async function processQuery(payload) {
         phoneNumber = phoneMatch[0];
         callerName = phoneNumber;
       } else {
-        // Look up name in saved contacts
         for (const [contactName, num] of Object.entries(userMemory.contacts)) {
           if (prompt.toLowerCase().includes(contactName)) {
             phoneNumber = num;
@@ -365,6 +365,7 @@ async function processQuery(payload) {
           provider: 'automation',
           text: `📞 [DEVICE AUTOMATION]: Calling ${callerName} (${phoneNumber}) on your Samsung Galaxy A55...`,
           url: `tel:${phoneNumber}`,
+          buttonText: `📞 Call ${callerName}`,
           success: true
         };
       } else {
@@ -373,6 +374,7 @@ async function processQuery(payload) {
           provider: 'automation',
           text: `📞 [DEVICE AUTOMATION]: Opening Phone Dialer for "${cleanName || 'Call'}"...`,
           url: 'tel:',
+          buttonText: '📞 Open Dialer',
           success: true
         };
       }
@@ -415,21 +417,39 @@ async function processQuery(payload) {
         appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
       }
 
-      return { provider: 'automation', text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`, url: appUrl, success: true };
+      return {
+        provider: 'automation',
+        text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`,
+        url: appUrl,
+        buttonText: `🚀 Open ${appName}`,
+        success: true
+      };
     }
 
     // 9. YOUTUBE
     if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`, url: ytUrl, success: true };
+      return {
+        provider: 'youtube',
+        text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`,
+        url: ytUrl,
+        buttonText: `▶️ Play on YouTube`,
+        success: true
+      };
     }
 
     // 10. SPOTIFY
     if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
-      return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`, url: spUrl, success: true };
+      return {
+        provider: 'spotify',
+        text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`,
+        url: spUrl,
+        buttonText: `🎵 Play on Spotify`,
+        success: true
+      };
     }
 
     // 11. PLAY STORE DOWNLOAD
@@ -437,7 +457,13 @@ async function processQuery(payload) {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
-      return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
+      return {
+        provider: 'automation',
+        text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`,
+        url: appUrl,
+        buttonText: `📥 Install ${targetApp}`,
+        success: true
+      };
     }
 
     // 12. TELEGRAM ALERTS
@@ -548,7 +574,7 @@ async function processQuery(payload) {
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH VISION & INLINE BUTTONS)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200); // Immediate ACK to Telegram
@@ -558,15 +584,12 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
   const msg = update.message;
   const chatId = msg.chat?.id;
-  const userText = msg.text || '';
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!chatId || !token) return;
+
   const senderName = msg.from?.first_name || msg.from?.username || 'User';
 
-  if (!chatId || !userText) return;
-
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
-
-  // Track Telegram User in Memory
+  // Save/Update Telegram User
   userMemory.telegramUsers[chatId] = {
     name: senderName,
     username: msg.from?.username || '',
@@ -574,8 +597,65 @@ app.post('/api/telegram-webhook', async (req, res) => {
   };
   saveUserMemory(userMemory);
 
+  // A. HANDLE INCOMING PHOTOS (GEMINI VISION AI)
+  if (msg.photo && msg.photo.length > 0) {
+    const highestPhoto = msg.photo[msg.photo.length - 1];
+    const caption = msg.caption || 'Is photo ko scan karke detail mein explain karo aur helpful answer do.';
+
+    try {
+      const fileRes = await axios.get(`https://api.telegram.org/bot${token.trim()}/getFile?file_id=${highestPhoto.file_id}`);
+      const filePath = fileRes.data?.result?.file_path;
+
+      if (filePath && process.env.GEMINI_API_KEY) {
+        const imageRes = await axios.get(`https://api.telegram.org/file/bot${token.trim()}/${filePath}`, {
+          responseType: 'arraybuffer'
+        });
+        const base64Image = Buffer.from(imageRes.data).toString('base64');
+
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+        const visionRes = await axios.post(geminiUrl, {
+          contents: [{
+            parts: [
+              { text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer clearly in natural Hinglish or English.\nUser query: ${caption}` },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64Image
+                }
+              }
+            ]
+          }]
+        }, { timeout: 25000 });
+
+        const visionText = visionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Photo analyzed successfully.';
+        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+          chat_id: chatId,
+          text: `👁️ [LUMINA VISION AI]:\n\n${visionText}`
+        });
+        return;
+      } else {
+        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+          chat_id: chatId,
+          text: `Photo receive ho gayi hai! Photo scan karne ke liye Render environment variables mein GEMINI_API_KEY hona zaroori hai.`
+        });
+        return;
+      }
+    } catch (e) {
+      console.error('[VISION ERROR]', e.message);
+      await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+        chat_id: chatId,
+        text: `Photo analysis error: ${e.message}`
+      });
+      return;
+    }
+  }
+
+  // B. HANDLE TEXT MESSAGES
+  const userText = msg.text || '';
+  if (!userText) return;
+
   if (userText === '/start') {
-    const welcomeMsg = `👋 Namaste ${senderName}!\n\nMain Lumina AI hoon—aapka personal intelligent assistant. Aap mujhse yahan seedha baat kar sakte hain, coding karwa sakte hain, notes save karwa sakte hain ya koi bhi sawal pooch sakte hain!`;
+    const welcomeMsg = `👋 Namaste ${senderName}!\n\nMain Lumina AI hoon—aapka personal intelligent assistant. Aap mujhse yahan seedha baat kar sakte hain, coding karwa sakte hain, photo scan karwa sakte hain, notes save karwa sakte hain ya koi bhi sawal pooch sakte hain!`;
     try {
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
         chat_id: chatId,
@@ -588,10 +668,28 @@ app.post('/api/telegram-webhook', async (req, res) => {
   try {
     const result = await processQuery({ prompt: userText, mode: 'telegram' });
     const replyText = result.text || 'Command executed.';
-    await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+
+    // Construct Telegram Payload with Inline Keyboard Button if URL is present
+    const telegramPayload = {
       chat_id: chatId,
       text: replyText
-    });
+    };
+
+    if (result.url) {
+      telegramPayload.reply_markup = {
+        inline_keyboard: [
+          [
+            {
+              text: result.buttonText || '🔗 Open Link',
+              url: result.url
+            }
+          ]
+        ]
+      };
+    }
+
+    await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, telegramPayload);
+
   } catch (err) {
     try {
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
