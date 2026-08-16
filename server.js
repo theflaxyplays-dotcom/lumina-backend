@@ -1,9 +1,6 @@
 /**
  * Lumina AI Assistant - Production 10/10 Architecture Server
- * Intelligent Routing:
- *   - Coding / Deep Reasoning ➔ NVIDIA Nemotron (Auto-Detected)
- *   - Casual / Routine Queries ➔ Groq (Llama 3.3 70B)
- *   - Resilient Fallback Chain ➔ Groq ➔ Gemini ➔ NVIDIA
+ * Intelligent Routing & Bug-Free Hardware Automation
  */
 
 import express from 'express';
@@ -69,14 +66,20 @@ function extractAndSaveUserFacts(prompt) {
   let updated = false;
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
   if (nameMatch && nameMatch) {
-    userMemory.userProfile.name = nameMatch.trim();
-    userMemory.facts.push(`User name: ${nameMatch.trim()}`);
+    const extractedName = nameMatch.trim();
+    userMemory.userProfile.name = extractedName;
+    if (!userMemory.facts.includes(`User name: ${extractedName}`)) {
+      userMemory.facts.push(`User name: ${extractedName}`);
+    }
     updated = true;
   }
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
   if (homeMatch && homeMatch) {
-    userMemory.userProfile.home = homeMatch.trim();
-    userMemory.facts.push(`User home: ${homeMatch.trim()}`);
+    const extractedHome = homeMatch.trim();
+    userMemory.userProfile.home = extractedHome;
+    if (!userMemory.facts.includes(`User home: ${extractedHome}`)) {
+      userMemory.facts.push(`User home: ${extractedHome}`);
+    }
     updated = true;
   }
   if (updated) saveUserMemory(userMemory);
@@ -115,12 +118,11 @@ function classifyRoute(payload) {
 // INTELLIGENT MULTI-MODEL ENGINE (NVIDIA ➔ GROQ ➔ GEMINI)
 // -------------------------------------------------------------
 async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferMode = '') {
-  // Deep Reasoning & Coding Keyword Detection
   const isCodingOrReasoning = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
 
   const shouldPreferNvidia = preferMode === 'nvidia' || isCodingOrReasoning;
 
-  // 1. Primary for Coding & Reasoning: NVIDIA Nemotron
+  // 1. Primary for Coding & Deep Reasoning: NVIDIA Nemotron
   if (shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
     try {
       console.log('[LUMINA ENGINE] ➔ Routing to NVIDIA Nemotron for Deep Reasoning/Coding...');
@@ -182,7 +184,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
     }
   }
 
-  // 4. Secondary Backup: NVIDIA Nemotron (if not already triggered)
+  // 4. Secondary Backup: NVIDIA Nemotron
   if (!shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
     try {
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -228,10 +230,11 @@ async function processQuery(payload) {
       let appUrl = 'tel:';
       const p = prompt.toLowerCase();
 
-      const phoneMatch = prompt.match(/(\d{10})/);
-      if (phoneMatch && phoneMatch) {
-        appName = `Phone Dialer (${phoneMatch})`;
-        appUrl = `tel:${phoneMatch}`;
+      const phoneMatch = prompt.match(/\b\d{10}\b/) || prompt.match(/(\d{10})/);
+      if (phoneMatch && phoneMatch[0]) {
+        const rawNumber = phoneMatch[0];
+        appName = `Phone Dialer (${rawNumber})`;
+        appUrl = `tel:${rawNumber}`;
       } else if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
       else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'https://www.instagram.com'; }
       else if (p.includes('telegram')) { appName = 'Telegram'; appUrl = 'https://t.me'; }
