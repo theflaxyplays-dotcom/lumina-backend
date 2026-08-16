@@ -1,12 +1,11 @@
 /**
  * Lumina AI Assistant - Production 10/10 Architecture Server
- * Features:
- *   - Telegram 2-Way Interactive Bot (Webhook Engine) with 1-Tap Buttons & Photo Scan
- *   - Contact Book & Name-based Calling (e.g., "Rahul ko call lagao")
- *   - Direct WhatsApp Messaging with Pre-filled Text
- *   - Smart Persistent Notes & Reminder Memory
- *   - NVIDIA Nemotron Coding Auto-Routing + Groq Fast LLM + Gemini Fallback
- *   - Hardware Torch, App Launcher, YouTube/Spotify, Live Weather & Web Search
+ * Powered by:
+ *   - Google Gemini 2.5 Flash (`gemini-2.5-flash`) for Vision & Fallback
+ *   - Groq Llama 3.2 Vision (`llama-3.2-11b-vision-preview`) + Llama 3.3 70B
+ *   - NVIDIA Nemotron (`nvidia/llama-3.1-nemotron-70b-instruct`) for Coding & Reasoning
+ *   - 2-Way Telegram Bot with 1-Tap Action Buttons
+ *   - Smart Notes, Contact Book, WhatsApp, Torch, Weather & Tavily Search
  */
 
 import express from 'express';
@@ -145,7 +144,7 @@ function classifyRoute(payload) {
 }
 
 // -------------------------------------------------------------
-// INTELLIGENT MULTI-MODEL ENGINE (NVIDIA ➔ GROQ ➔ GEMINI)
+// INTELLIGENT MULTI-MODEL ENGINE (NVIDIA ➔ GROQ ➔ GEMINI 2.5)
 // -------------------------------------------------------------
 async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferMode = '') {
   const isCodingOrReasoning = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
@@ -194,10 +193,10 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
     }
   }
 
-  // 3. First Fallback: Google Gemini API (gemini-1.5-flash)
+  // 3. First Fallback: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
   if (process.env.GEMINI_API_KEY) {
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
       const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
       
       const res = await axios.post(geminiUrl, {
@@ -206,10 +205,10 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
 
       const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
-        return { text: text, provider: 'gemini (fallback)' };
+        return { text: text, provider: 'gemini-2.5-flash (fallback)' };
       }
     } catch (e) {
-      console.warn('[GEMINI API FAIL] ➔ Switching to NVIDIA Fallback:', e.message);
+      console.warn('[GEMINI 2.5 FAIL] ➔ Switching to NVIDIA Fallback:', e.message);
     }
   }
 
@@ -256,7 +255,7 @@ async function processQuery(payload) {
       saveUserMemory(userMemory);
       return {
         provider: 'memory',
-        text: `📝 [SMART NOTES]: Note save kar liya gaya hai: "${noteItem.text}" (${noteItem.date})`,
+        text: `📝 [SMART NOTES]: Note save kar liya gaya hai:\n"${noteItem.text}" (${noteItem.date})`,
         success: true
       };
     }
@@ -308,7 +307,6 @@ async function processQuery(payload) {
         targetNumber = phoneMatch[0];
         msgText = prompt.replace(phoneMatch[0], '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|par message)\b/gi, '').trim();
       } else {
-        const words = prompt.toLowerCase().split(/\s+/);
         for (const [contactName, num] of Object.entries(userMemory.contacts)) {
           if (prompt.toLowerCase().includes(contactName)) {
             targetNumber = num;
@@ -322,8 +320,8 @@ async function processQuery(payload) {
       if (targetNumber) {
         waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
-          provider: 'automation',
-          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp to send message to ${targetNumber}:\n"${msgText || 'Hello'}"...`,
+          provider: 'whatsapp',
+          text: `💬 [WHATSAPP ENGINE]: WhatsApp message ready for ${targetNumber}:\n"${msgText || 'Hello'}"`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp Chat',
           success: true
@@ -332,8 +330,8 @@ async function processQuery(payload) {
         msgText = prompt.replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko)\b/gi, '').trim();
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
-          provider: 'automation',
-          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp with message:\n"${msgText}"...`,
+          provider: 'whatsapp',
+          text: `💬 [WHATSAPP ENGINE]: WhatsApp message ready:\n"${msgText}"`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp',
           success: true
@@ -341,7 +339,7 @@ async function processQuery(payload) {
       }
     }
 
-    // 6. CALL HANDLER (BY NUMBER OR BY NAME)
+    // 6. CALL HANDLER
     if (provider === 'call_handler') {
       let phoneNumber = '';
       let callerName = 'Phone Dialer';
@@ -363,7 +361,7 @@ async function processQuery(payload) {
       if (phoneNumber) {
         return {
           provider: 'automation',
-          text: `📞 [DEVICE AUTOMATION]: Calling ${callerName} (${phoneNumber}) on your Samsung Galaxy A55...`,
+          text: `📞 [DEVICE AUTOMATION]: Ready to call ${callerName} (${phoneNumber})...`,
           url: `tel:${phoneNumber}`,
           buttonText: `📞 Call ${callerName}`,
           success: true
@@ -419,7 +417,7 @@ async function processQuery(payload) {
 
       return {
         provider: 'automation',
-        text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`,
+        text: `[DEVICE AUTOMATION]: Launching ${appName}...`,
         url: appUrl,
         buttonText: `🚀 Open ${appName}`,
         success: true
@@ -459,7 +457,7 @@ async function processQuery(payload) {
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
       return {
         provider: 'automation',
-        text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`,
+        text: `[PLAY STORE DOWNLOADER]: Download ${targetApp} from Play Store...`,
         url: appUrl,
         buttonText: `📥 Install ${targetApp}`,
         success: true
@@ -548,7 +546,7 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 15. DEFAULT LLM CHAT (NVIDIA / GROQ / GEMINI)
+    // 15. DEFAULT LLM CHAT (NVIDIA / GROQ / GEMINI 2.5)
     const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
     const contactsText = Object.keys(userMemory.contacts).length > 0 ? ` SAVED CONTACTS: [${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}].` : '';
     const notesText = userMemory.notes.length > 0 ? ` USER SAVED NOTES: [${userMemory.notes.map(n => n.text).join('; ')}].` : '';
@@ -574,7 +572,7 @@ async function processQuery(payload) {
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH VISION & INLINE BUTTONS)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH MULTI-MODEL VISION & BUTTONS)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200); // Immediate ACK to Telegram
@@ -597,7 +595,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   };
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (GEMINI VISION AI)
+  // A. HANDLE INCOMING PHOTOS (GEMINI 2.5 FLASH + GROQ LLAMA 3.2 VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko scan karke detail mein explain karo aur helpful answer do.';
@@ -606,42 +604,82 @@ app.post('/api/telegram-webhook', async (req, res) => {
       const fileRes = await axios.get(`https://api.telegram.org/bot${token.trim()}/getFile?file_id=${highestPhoto.file_id}`);
       const filePath = fileRes.data?.result?.file_path;
 
-      if (filePath && process.env.GEMINI_API_KEY) {
-        const imageRes = await axios.get(`https://api.telegram.org/file/bot${token.trim()}/${filePath}`, {
-          responseType: 'arraybuffer'
-        });
-        const base64Image = Buffer.from(imageRes.data).toString('base64');
-
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
-        const visionRes = await axios.post(geminiUrl, {
-          contents: [{
-            parts: [
-              { text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer clearly in natural Hinglish or English.\nUser query: ${caption}` },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: base64Image
-                }
-              }
-            ]
-          }]
-        }, { timeout: 25000 });
-
-        const visionText = visionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Photo analyzed successfully.';
+      if (!filePath) {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId,
-          text: `👁️ [LUMINA VISION AI]:\n\n${visionText}`
-        });
-        return;
-      } else {
-        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
-          chat_id: chatId,
-          text: `Photo receive ho gayi hai! Photo scan karne ke liye Render environment variables mein GEMINI_API_KEY hona zaroori hai.`
+          text: `Photo download path nahi mil paya. Kripya dobara bhej kar dekhein.`
         });
         return;
       }
+
+      // Download photo buffer
+      const imageRes = await axios.get(`https://api.telegram.org/file/bot${token.trim()}/${filePath}`, {
+        responseType: 'arraybuffer'
+      });
+      const base64Image = Buffer.from(imageRes.data).toString('base64');
+      let visionAnswer = '';
+
+      // 1. Primary: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+          const geminiVisionRes = await axios.post(geminiUrl, {
+            contents: [{
+              parts: [
+                { text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer clearly in natural Hinglish or English.\nUser query: ${caption}` },
+                { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
+              ]
+            }]
+          }, { timeout: 25000 });
+
+          visionAnswer = geminiVisionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        } catch (geminiErr) {
+          console.warn('[GEMINI 2.5 VISION FAIL] ➔ Trying Groq Vision Fallback:', geminiErr.message);
+        }
+      }
+
+      // 2. Fallback: Groq Llama 3.2 Vision (`llama-3.2-11b-vision-preview`)
+      if (!visionAnswer && process.env.GROQ_API_KEY) {
+        try {
+          const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+            model: 'llama-3.2-11b-vision-preview',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer in natural Hinglish or English.\nUser query: ${caption}` },
+                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+                ]
+              }
+            ],
+            temperature: 0.6,
+            max_tokens: 1024
+          }, {
+            headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` },
+            timeout: 25000
+          });
+
+          visionAnswer = groqVisionRes.data?.choices?.[0]?.message?.content;
+        } catch (groqErr) {
+          console.warn('[GROQ VISION FAIL]:', groqErr.message);
+        }
+      }
+
+      if (visionAnswer) {
+        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+          chat_id: chatId,
+          text: `👁️ [LUMINA VISION AI]:\n\n${visionAnswer}`
+        });
+      } else {
+        await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+          chat_id: chatId,
+          text: `Photo receive ho gayi hai lekin vision models se answer generate nahi ho paya.`
+        });
+      }
+      return;
+
     } catch (e) {
-      console.error('[VISION ERROR]', e.message);
+      console.error('[TELEGRAM PHOTO ERROR]', e.message);
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
         chat_id: chatId,
         text: `Photo analysis error: ${e.message}`
@@ -669,7 +707,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const result = await processQuery({ prompt: userText, mode: 'telegram' });
     const replyText = result.text || 'Command executed.';
 
-    // Construct Telegram Payload with Inline Keyboard Button if URL is present
     const telegramPayload = {
       chat_id: chatId,
       text: replyText
@@ -680,7 +717,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
         inline_keyboard: [
           [
             {
-              text: result.buttonText || '🔗 Open Link',
+              text: result.buttonText || '🔗 Open Action Link',
               url: result.url
             }
           ]
