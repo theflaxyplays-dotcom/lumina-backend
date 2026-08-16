@@ -1,6 +1,12 @@
 /**
  * Lumina AI Assistant - Production 10/10 Architecture Server
- * Intelligent Routing & Bug-Free Hardware Automation
+ * Features:
+ *   - Telegram 2-Way Interactive Bot (Webhook Engine)
+ *   - Contact Book & Name-based Calling (e.g., "Rahul ko call lagao")
+ *   - Direct WhatsApp Messaging with Pre-filled Text
+ *   - Smart Persistent Notes & Reminder Memory
+ *   - NVIDIA Nemotron Coding Auto-Routing + Groq Fast LLM + Gemini Fallback
+ *   - Hardware Torch, App Launcher, YouTube/Spotify, Live Weather & Web Search
  */
 
 import express from 'express';
@@ -27,9 +33,21 @@ const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
 
 function loadUserMemory() {
   try {
-    if (fs.existsSync(MEMORY_FILE)) return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+    if (fs.existsSync(MEMORY_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+      if (!data.contacts) data.contacts = {};
+      if (!data.notes) data.notes = [];
+      if (!data.telegramUsers) data.telegramUsers = {};
+      return data;
+    }
   } catch (e) {}
-  return { facts: [], userProfile: { home: 'Nepanagar, MP' } };
+  return { 
+    facts: [], 
+    userProfile: { home: 'Nepanagar, MP' },
+    contacts: {},
+    notes: [],
+    telegramUsers: {}
+  };
 }
 
 function saveUserMemory(memoryData) {
@@ -101,9 +119,21 @@ function parseDelayMs(prompt = '') {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
+  // 1. Smart Notes Management
+  if (/\b(note kar lo|note karo|save note|note down|yaad rakhna)\b/i.test(prompt)) return 'save_note';
+  if (/\b(mere notes|show notes|read notes|kya note kiya|list notes)\b/i.test(prompt)) return 'read_notes';
+  if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
+
+  // 2. Contact Management (Save Contact)
+  if (/\b(save contact|number save|contact save)\b/i.test(prompt)) return 'save_contact';
+
+  // 3. WhatsApp Direct Intent
+  if (/\b(whatsapp|wa message)\b/i.test(prompt) && /\b(send|bhejo|message|msg|karo)\b/i.test(prompt)) return 'whatsapp_direct';
+
+  // 4. Hardware & Automation
   if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
-  if (/\b(call|dial|dialer|phone|number)\b/i.test(prompt) || /\d{10}/.test(prompt)) return 'app_launcher';
-  if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram';
+  if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) || /\b\d{10}\b/.test(prompt)) return 'call_handler';
+  if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram_alert';
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
@@ -125,7 +155,6 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
   // 1. Primary for Coding & Deep Reasoning: NVIDIA Nemotron
   if (shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
     try {
-      console.log('[LUMINA ENGINE] ➔ Routing to NVIDIA Nemotron for Deep Reasoning/Coding...');
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
         model: 'nvidia/llama-3.1-nemotron-70b-instruct',
         messages: [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }],
@@ -215,6 +244,141 @@ async function processQuery(payload) {
   extractAndSaveUserFacts(prompt);
 
   try {
+    // 1. SMART NOTES SAVE
+    if (provider === 'save_note') {
+      const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|yaad rakhna|ki)\b/gi, '').trim();
+      const noteItem = {
+        id: Date.now(),
+        text: cleanNote || prompt,
+        date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+      };
+      userMemory.notes.push(noteItem);
+      saveUserMemory(userMemory);
+      return {
+        provider: 'memory',
+        text: `📝 [SMART NOTES]: Note save kar liya gaya hai: "${noteItem.text}" (${noteItem.date})`,
+        success: true
+      };
+    }
+
+    // 2. READ NOTES
+    if (provider === 'read_notes') {
+      if (!userMemory.notes || userMemory.notes.length === 0) {
+        return { provider: 'memory', text: `📝 [SMART NOTES]: Aapke paas abhi koi saved notes nahi hain.`, success: true };
+      }
+      const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text} [${n.date}]`).join('\n');
+      return {
+        provider: 'memory',
+        text: `📝 [SAVED NOTES & REMINDERS]:\n${notesList}`,
+        success: true
+      };
+    }
+
+    // 3. CLEAR NOTES
+    if (provider === 'clear_notes') {
+      userMemory.notes = [];
+      saveUserMemory(userMemory);
+      return { provider: 'memory', text: `🗑️ [SMART NOTES]: Sabhi notes clear kar diye gaye hain.`, success: true };
+    }
+
+    // 4. SAVE CONTACT
+    if (provider === 'save_contact') {
+      const phoneMatch = prompt.match(/\b\d{10}\b/);
+      let name = prompt.replace(/\b(save contact|save|contact|number|ka|ko)\b/gi, '').replace(/\b\d{10}\b/, '').trim();
+      if (phoneMatch && name) {
+        name = name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim();
+        userMemory.contacts[name] = phoneMatch[0];
+        saveUserMemory(userMemory);
+        return {
+          provider: 'contacts',
+          text: `📇 [CONTACT BOOK]: ${name.toUpperCase()} ka number (${phoneMatch[0]}) successfully save ho gaya hai!`,
+          success: true
+        };
+      }
+      return { provider: 'contacts', text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
+    }
+
+    // 5. DIRECT WHATSAPP MESSAGE
+    if (provider === 'whatsapp_direct') {
+      let targetNumber = '';
+      let msgText = '';
+
+      const phoneMatch = prompt.match(/\b\d{10}\b/);
+      if (phoneMatch) {
+        targetNumber = phoneMatch[0];
+        msgText = prompt.replace(phoneMatch[0], '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|par message)\b/gi, '').trim();
+      } else {
+        // Search by contact name in userMemory.contacts
+        const words = prompt.toLowerCase().split(/\s+/);
+        for (const [contactName, num] of Object.entries(userMemory.contacts)) {
+          if (prompt.toLowerCase().includes(contactName)) {
+            targetNumber = num;
+            msgText = prompt.replace(new RegExp(contactName, 'gi'), '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|ki)\b/gi, '').trim();
+            break;
+          }
+        }
+      }
+
+      let waUrl = 'https://api.whatsapp.com';
+      if (targetNumber) {
+        waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
+        return {
+          provider: 'automation',
+          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp to send message to ${targetNumber}: "${msgText || 'Hello'}"...`,
+          url: waUrl,
+          success: true
+        };
+      } else {
+        msgText = prompt.replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko)\b/gi, '').trim();
+        waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
+        return {
+          provider: 'automation',
+          text: `💬 [WHATSAPP ENGINE]: Opening WhatsApp with message: "${msgText}"...`,
+          url: waUrl,
+          success: true
+        };
+      }
+    }
+
+    // 6. CALL HANDLER (BY NUMBER OR BY NAME)
+    if (provider === 'call_handler') {
+      let phoneNumber = '';
+      let callerName = 'Phone Dialer';
+
+      const phoneMatch = prompt.match(/\b\d{10}\b/);
+      if (phoneMatch) {
+        phoneNumber = phoneMatch[0];
+        callerName = phoneNumber;
+      } else {
+        // Look up name in saved contacts
+        for (const [contactName, num] of Object.entries(userMemory.contacts)) {
+          if (prompt.toLowerCase().includes(contactName)) {
+            phoneNumber = num;
+            callerName = contactName.toUpperCase();
+            break;
+          }
+        }
+      }
+
+      if (phoneNumber) {
+        return {
+          provider: 'automation',
+          text: `📞 [DEVICE AUTOMATION]: Calling ${callerName} (${phoneNumber}) on your Samsung Galaxy A55...`,
+          url: `tel:${phoneNumber}`,
+          success: true
+        };
+      } else {
+        const cleanName = prompt.replace(/\b(call|dial|dialer|phone|lagao|karo|ko)\b/gi, '').trim();
+        return {
+          provider: 'automation',
+          text: `📞 [DEVICE AUTOMATION]: Opening Phone Dialer for "${cleanName || 'Call'}"...`,
+          url: 'tel:',
+          success: true
+        };
+      }
+    }
+
+    // 7. HARDWARE TORCH
     if (provider === 'torch') {
       const turnOn = !prompt.toLowerCase().includes('off') && !prompt.toLowerCase().includes('band');
       return {
@@ -225,17 +389,13 @@ async function processQuery(payload) {
       };
     }
 
+    // 8. APP LAUNCHER
     if (provider === 'app_launcher') {
-      let appName = 'Phone Dialer';
-      let appUrl = 'tel:';
+      let appName = 'App';
+      let appUrl = 'https://play.google.com';
       const p = prompt.toLowerCase();
 
-      const phoneMatch = prompt.match(/\b\d{10}\b/) || prompt.match(/(\d{10})/);
-      if (phoneMatch && phoneMatch[0]) {
-        const rawNumber = phoneMatch[0];
-        appName = `Phone Dialer (${rawNumber})`;
-        appUrl = `tel:${rawNumber}`;
-      } else if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
+      if (p.includes('whatsapp')) { appName = 'WhatsApp'; appUrl = 'https://api.whatsapp.com'; }
       else if (p.includes('instagram')) { appName = 'Instagram'; appUrl = 'https://www.instagram.com'; }
       else if (p.includes('telegram')) { appName = 'Telegram'; appUrl = 'https://t.me'; }
       else if (p.includes('free fire') || p.includes('freefire')) { appName = 'Free Fire MAX'; appUrl = 'https://play.google.com/store/apps/details?id=com.dts.freefiremax'; }
@@ -249,7 +409,6 @@ async function processQuery(payload) {
       else if (p.includes('play store') || p.includes('store')) { appName = 'Play Store'; appUrl = 'https://play.google.com'; }
       else if (p.includes('termux')) { appName = 'Termux'; appUrl = 'https://f-droid.org/packages/com.termux/'; }
       else if (p.includes('calculator')) { appName = 'Calculator'; appUrl = 'https://www.google.com/search?q=calculator'; }
-      else if (p.includes('dialer') || p.includes('phone') || p.includes('call')) { appName = 'Phone Dialer'; appUrl = 'tel:'; }
       else {
         const cleanName = prompt.replace(/\b(open|kholo|launch|chalu|start|app)\b/gi, '').trim();
         appName = cleanName || 'App';
@@ -259,18 +418,21 @@ async function processQuery(payload) {
       return { provider: 'automation', text: `[DEVICE AUTOMATION]: Opening ${appName} on your Samsung Galaxy A55...`, url: appUrl, success: true };
     }
 
+    // 9. YOUTUBE
     if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
       return { provider: 'youtube', text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`, url: ytUrl, success: true };
     }
 
+    // 10. SPOTIFY
     if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
       return { provider: 'spotify', text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`, url: spUrl, success: true };
     }
 
+    // 11. PLAY STORE DOWNLOAD
     if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
@@ -278,7 +440,8 @@ async function processQuery(payload) {
       return { provider: 'automation', text: `[PLAY STORE DOWNLOADER]: Opening Play Store to download ${targetApp}...`, url: appUrl, success: true };
     }
 
-    if (provider === 'telegram') {
+    // 12. TELEGRAM ALERTS
+    if (provider === 'telegram_alert') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
       const delayMs = parseDelayMs(prompt);
@@ -314,6 +477,7 @@ async function processQuery(payload) {
       }
     }
 
+    // 13. WEATHER
     if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -338,6 +502,7 @@ async function processQuery(payload) {
       }
     }
 
+    // 14. TAVILY SEARCH
     if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -357,11 +522,14 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // Default Multi-Model LLM Execution
+    // 15. DEFAULT LLM CHAT (NVIDIA / GROQ / GEMINI)
     const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
+    const contactsText = Object.keys(userMemory.contacts).length > 0 ? ` SAVED CONTACTS: [${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}].` : '';
+    const notesText = userMemory.notes.length > 0 ? ` USER SAVED NOTES: [${userMemory.notes.map(n => n.text).join('; ')}].` : '';
+
     const systemMessage = {
       role: 'system',
-      content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
+      content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
     };
 
     chatMemory[0] = systemMessage;
@@ -378,6 +546,80 @@ async function processQuery(payload) {
     return { provider: fallbackRes.provider, text: fallbackRes.text, success: true };
   }
 }
+
+// -------------------------------------------------------------
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT
+// -------------------------------------------------------------
+app.post('/api/telegram-webhook', async (req, res) => {
+  res.sendStatus(200); // Immediate ACK to Telegram
+
+  const update = req.body;
+  if (!update || !update.message) return;
+
+  const msg = update.message;
+  const chatId = msg.chat?.id;
+  const userText = msg.text || '';
+  const senderName = msg.from?.first_name || msg.from?.username || 'User';
+
+  if (!chatId || !userText) return;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
+  // Track Telegram User in Memory
+  userMemory.telegramUsers[chatId] = {
+    name: senderName,
+    username: msg.from?.username || '',
+    lastActive: new Date().toISOString()
+  };
+  saveUserMemory(userMemory);
+
+  if (userText === '/start') {
+    const welcomeMsg = `👋 Namaste ${senderName}!\n\nMain Lumina AI hoon—aapka personal intelligent assistant. Aap mujhse yahan seedha baat kar sakte hain, coding karwa sakte hain, notes save karwa sakte hain ya koi bhi sawal pooch sakte hain!`;
+    try {
+      await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+        chat_id: chatId,
+        text: welcomeMsg
+      });
+    } catch (e) {}
+    return;
+  }
+
+  try {
+    const result = await processQuery({ prompt: userText, mode: 'telegram' });
+    const replyText = result.text || 'Command executed.';
+    await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+      chat_id: chatId,
+      text: replyText
+    });
+  } catch (err) {
+    try {
+      await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+        chat_id: chatId,
+        text: `Lumina: Processing error: ${err.message}`
+      });
+    } catch (e) {}
+  }
+});
+
+// Endpoint to automatically link Telegram Webhook to Render
+app.get('/api/setup-telegram', async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const host = req.get('host');
+  const protocol = req.protocol === 'https' || host.includes('onrender.com') ? 'https' : 'http';
+  const webhookUrl = `${protocol}://${host}/api/telegram-webhook`;
+
+  if (!token) {
+    return res.json({ success: false, message: 'TELEGRAM_BOT_TOKEN not found in environment variables.' });
+  }
+
+  try {
+    const tgRes = await axios.get(`https://api.telegram.org/bot${token.trim()}/setWebhook?url=${webhookUrl}`);
+    return res.json({ success: true, webhookUrl, telegramResponse: tgRes.data });
+  } catch (e) {
+    return res.json({ success: false, error: e.message });
+  }
+});
 
 app.get('/health', (req, res) => res.json({ status: 'ONLINE', timestamp: new Date().toISOString() }));
 
