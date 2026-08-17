@@ -1,9 +1,10 @@
 /**
- * Lumina AI Assistant - Production 10/10 Architecture Server
+ * Lumina AI Assistant - Unified Memory & Single Personality Server
  * Powered by:
  *   - Google Gemini 2.5 Flash (`gemini-2.5-flash`) for Vision & Fallback
  *   - Groq Llama 3.2 Vision (`llama-3.2-11b-vision-preview`) + Llama 3.3 70B
  *   - NVIDIA Nemotron (`nvidia/llama-3.1-nemotron-70b-instruct`) for Coding & Reasoning
+ *   - Unified Cross-Modal Memory (Vision + Chat share exact same memory)
  *   - 2-Way Telegram Bot with 1-Tap Action Buttons
  *   - Smart Notes, Contact Book, WhatsApp, Torch, Weather & Tavily Search
  */
@@ -42,7 +43,7 @@ function loadUserMemory() {
   } catch (e) {}
   return { 
     facts: [], 
-    userProfile: { home: 'Nepanagar, MP' },
+    userProfile: { home: 'Nepanagar, MP', name: 'Flaxy' },
     contacts: {},
     notes: [],
     telegramUsers: {}
@@ -56,7 +57,7 @@ function saveUserMemory(memoryData) {
 let userMemory = loadUserMemory();
 
 const chatMemory = [
-  { role: 'system', content: 'You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync. Speak warmly, confidently, and helpfully in natural Hinglish or English.' }
+  { role: 'system', content: 'You are Lumina, a highly intelligent personal AI Assistant for Flaxy (avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync. Always speak warmly, confidently, and helpfully strictly in Romanized Hinglish (English alphabet). Never write in Devanagari script.' }
 ];
 
 function extractCity(prompt = '') {
@@ -539,7 +540,7 @@ async function processQuery(payload) {
         const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
 
         if (liveFacts) {
-          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately in Hinglish.' };
+          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately strictly in Romanized Hinglish (English letters). Never use Devanagari script.' };
           const synthRes = await queryLLMWithFallback(systemMsg, `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}`, [], payload.mode);
           return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.text}`, success: true };
         }
@@ -553,7 +554,7 @@ async function processQuery(payload) {
 
     const systemMessage = {
       role: 'system',
-      content: `You are Lumina, a highly intelligent AI Assistant with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText} Always answer warmly, confidently, and helpfully in natural Hinglish or English.`
+      content: `You are Lumina, Flaxy's personal intelligent AI Assistant (Telegram profile avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText} Strict rule: Always speak warmly, confidently, and helpfully strictly in natural Romanized Hinglish (English alphabet, e.g., "Kaise ho Flaxy?"). NEVER write in Devanagari script.`
     };
 
     chatMemory[0] = systemMessage;
@@ -572,7 +573,7 @@ async function processQuery(payload) {
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH MULTI-MODEL VISION & BUTTONS)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH UNIFIED VISION & MEMORY)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200); // Immediate ACK to Telegram
@@ -595,7 +596,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   };
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (GEMINI 2.5 FLASH + GROQ LLAMA 3.2 VISION)
+  // A. HANDLE INCOMING PHOTOS (GEMINI 2.5 FLASH + GROQ VISION WITH UNIFIED MEMORY)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko scan karke detail mein explain karo aur helpful answer do.';
@@ -626,7 +627,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
           const geminiVisionRes = await axios.post(geminiUrl, {
             contents: [{
               parts: [
-                { text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer clearly in natural Hinglish or English.\nUser query: ${caption}` },
+                { text: `You are Lumina AI Assistant for Flaxy (avatar: Lumine from Genshin Impact). Analyze this image thoroughly and answer strictly in natural Romanized Hinglish (English alphabet). Do NOT use Devanagari script.\nUser query: ${caption}` },
                 { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
               ]
             }]
@@ -647,7 +648,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer in natural Hinglish or English.\nUser query: ${caption}` },
+                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer strictly in Romanized Hinglish (English alphabet). Do NOT use Devanagari script.\nUser query: ${caption}` },
                   { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
                 ]
               }
@@ -666,6 +667,11 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
 
       if (visionAnswer) {
+        // UNIFIED CONTEXT: Save Vision result into chatMemory so Chat API knows about this photo!
+        chatMemory.push({ role: 'user', content: `[User sent a photo]: ${caption}` });
+        chatMemory.push({ role: 'assistant', content: visionAnswer });
+        if (chatMemory.length > 30) chatMemory.splice(1, 2);
+
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId,
           text: `👁️ [LUMINA VISION AI]:\n\n${visionAnswer}`
