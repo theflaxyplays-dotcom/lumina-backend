@@ -1,10 +1,10 @@
 /**
- * Lumina AI Assistant - Adaptive Intelligence & Balanced Server
+ * Lumina AI Assistant - 100% Unified Single Persona Architecture
  * Powered by:
  *   - Google Gemini 2.5 Flash (`gemini-2.5-flash`) for Vision & Fallback
- *   - Groq Llama 3.2 Vision + Llama 3.3 70B (Adaptive Smart Chat)
- *   - NVIDIA Nemotron for Deep Coding & Complex Logic
- *   - Persistent Memory & Instant Recall (`lumina_user_memory.json`)
+ *   - Groq Llama 3.2 Vision + Llama 3.3 70B (Smart, Cohesive Persona)
+ *   - NVIDIA Nemotron for Coding & Complex Logic
+ *   - Universal Cross-Tool Memory (All Tools, APIs & Vision share 1 Brain)
  *   - 2-Way Telegram Bot with 1-Tap Action Buttons
  */
 
@@ -38,6 +38,7 @@ function loadUserMemory() {
       if (!data.notes) data.notes = [];
       if (!data.facts) data.facts = [];
       if (!data.telegramUsers) data.telegramUsers = {};
+      if (!data.recentActivity) data.recentActivity = [];
       return data;
     }
   } catch (e) {}
@@ -46,7 +47,8 @@ function loadUserMemory() {
     userProfile: { home: 'Nepanagar, MP', name: 'Flaxy' },
     contacts: {},
     notes: [],
-    telegramUsers: {}
+    telegramUsers: {},
+    recentActivity: []
   };
 }
 
@@ -57,7 +59,7 @@ function saveUserMemory(memoryData) {
 let userMemory = loadUserMemory();
 
 const chatMemory = [
-  { role: 'system', content: 'You are Lumina, Flaxy\'s personal intelligent AI Assistant (avatar: Lumine from Genshin Impact). Always speak warmly and smartly in natural Romanized Hinglish (English alphabet). Adapt your answer length intelligently based on the task.' }
+  { role: 'system', content: 'You are Lumina, Flaxy\'s personal self-aware AI Assistant (Telegram avatar: Lumine from Genshin Impact). Speak naturally, warmly, and smartly in first-person Romanized Hinglish (English alphabet). Never write in Devanagari script.' }
 ];
 
 function extractCity(prompt = '') {
@@ -131,7 +133,7 @@ function parseDelayMs(prompt = '') {
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
-  // 1. Smart Notes Management
+  // 1. Smart Notes
   if (/\b(note kar lo|note karo|save note|note down|kuch note karna hai)\b/i.test(prompt)) return 'save_note';
   if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
@@ -170,7 +172,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
         model: 'nvidia/llama-3.1-nemotron-70b-instruct',
         messages: [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }],
-        temperature: 0.5,
+        temperature: 0.4,
         max_tokens: 2048
       }, {
         headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
@@ -226,7 +228,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
     }
   }
 
-  return { text: `Lumina: Command receive ho gaya.`, provider: 'lumina_local' };
+  return { text: `Command receive ho gaya.`, provider: 'lumina_local' };
 }
 
 async function processQuery(payload) {
@@ -236,6 +238,8 @@ async function processQuery(payload) {
   extractAndSaveUserFacts(prompt);
 
   try {
+    let result = null;
+
     // 1. SMART NOTES SAVE
     if (provider === 'save_note') {
       const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|ki)\b/gi, '').trim();
@@ -246,52 +250,54 @@ async function processQuery(payload) {
       };
       userMemory.notes.push(noteItem);
       saveUserMemory(userMemory);
-      return {
-        provider: 'memory',
-        text: `📝 Note save ho gaya: "${noteItem.text}"`,
+      result = {
+        provider: 'lumina',
+        text: `Maine note save kar liya hai: "${noteItem.text}" 📝`,
         success: true
       };
     }
 
     // 2. READ NOTES
-    if (provider === 'read_notes') {
+    else if (provider === 'read_notes') {
       if (!userMemory.notes || userMemory.notes.length === 0) {
-        return { provider: 'memory', text: `📝 Aapke paas abhi koi saved notes nahi hain.`, success: true };
+        result = { provider: 'lumina', text: `Aapke paas abhi koi saved notes nahi hain.`, success: true };
+      } else {
+        const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text}`).join('\n');
+        result = {
+          provider: 'lumina',
+          text: `Aapke saved notes yeh rahe:\n${notesList}`,
+          success: true
+        };
       }
-      const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text}`).join('\n');
-      return {
-        provider: 'memory',
-        text: `📝 Aapke Saved Notes:\n${notesList}`,
-        success: true
-      };
     }
 
     // 3. CLEAR NOTES
-    if (provider === 'clear_notes') {
+    else if (provider === 'clear_notes') {
       userMemory.notes = [];
       saveUserMemory(userMemory);
-      return { provider: 'memory', text: `🗑️ Sabhi notes clear kar diye gaye hain.`, success: true };
+      result = { provider: 'lumina', text: `Sabhi notes clear kar diye gaye hain! 🗑️`, success: true };
     }
 
     // 4. SAVE CONTACT
-    if (provider === 'save_contact') {
+    else if (provider === 'save_contact') {
       const phoneMatch = prompt.match(/\b\d{10}\b/);
       let name = prompt.replace(/\b(save contact|save|contact|number|ka|ko)\b/gi, '').replace(/\b\d{10}\b/, '').trim();
       if (phoneMatch && name) {
         name = name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim();
         userMemory.contacts[name] = phoneMatch[0];
         saveUserMemory(userMemory);
-        return {
-          provider: 'contacts',
-          text: `📇 ${name.toUpperCase()} ka number (${phoneMatch[0]}) save ho gaya!`,
+        result = {
+          provider: 'lumina',
+          text: `${name.toUpperCase()} ka number (${phoneMatch[0]}) meri memory mein save ho gaya hai! 📇`,
           success: true
         };
+      } else {
+        result = { provider: 'lumina', text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
       }
-      return { provider: 'contacts', text: `Contact save karne ke liye name aur number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
     }
 
     // 5. DIRECT WHATSAPP MESSAGE
-    if (provider === 'whatsapp_direct') {
+    else if (provider === 'whatsapp_direct') {
       let targetNumber = '';
       let msgText = '';
 
@@ -312,9 +318,9 @@ async function processQuery(payload) {
       let waUrl = 'https://api.whatsapp.com';
       if (targetNumber) {
         waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
-        return {
-          provider: 'whatsapp',
-          text: `💬 WhatsApp message ready for ${targetNumber}: "${msgText || 'Hello'}"`,
+        result = {
+          provider: 'lumina',
+          text: `WhatsApp message ready kar diya hai ${targetNumber} ke liye: "${msgText || 'Hello'}" 💬`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp Chat',
           success: true
@@ -322,9 +328,9 @@ async function processQuery(payload) {
       } else {
         msgText = prompt.replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko)\b/gi, '').trim();
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
-        return {
-          provider: 'whatsapp',
-          text: `💬 WhatsApp message ready: "${msgText}"`,
+        result = {
+          provider: 'lumina',
+          text: `WhatsApp message ready hai: "${msgText}" 💬`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp',
           success: true
@@ -333,7 +339,7 @@ async function processQuery(payload) {
     }
 
     // 6. CALL HANDLER
-    if (provider === 'call_handler') {
+    else if (provider === 'call_handler') {
       let phoneNumber = '';
       let callerName = 'Phone Dialer';
 
@@ -352,18 +358,18 @@ async function processQuery(payload) {
       }
 
       if (phoneNumber) {
-        return {
-          provider: 'automation',
-          text: `📞 Calling ${callerName} (${phoneNumber})...`,
+        result = {
+          provider: 'lumina',
+          text: `${callerName} (${phoneNumber}) ko call laga rahi hoon... 📞`,
           url: `tel:${phoneNumber}`,
           buttonText: `📞 Call ${callerName}`,
           success: true
         };
       } else {
         const cleanName = prompt.replace(/\b(call|dial|dialer|phone|lagao|karo|ko)\b/gi, '').trim();
-        return {
-          provider: 'automation',
-          text: `📞 Opening Dialer for "${cleanName || 'Call'}"...`,
+        result = {
+          provider: 'lumina',
+          text: `Phone dialer open kar rahi hoon "${cleanName || 'Call'}" ke liye... 📞`,
           url: 'tel:',
           buttonText: '📞 Open Dialer',
           success: true
@@ -372,18 +378,18 @@ async function processQuery(payload) {
     }
 
     // 7. HARDWARE TORCH
-    if (provider === 'torch') {
+    else if (provider === 'torch') {
       const turnOn = !prompt.toLowerCase().includes('off') && !prompt.toLowerCase().includes('band');
-      return {
-        provider: 'hardware',
-        text: `[DEVICE HARDWARE]: Flashlight Torch ${turnOn ? 'ON' : 'OFF'}!`,
+      result = {
+        provider: 'lumina',
+        text: `Flashlight ${turnOn ? 'ON kar di hai' : 'OFF kar di hai'}! 🔦`,
         action: turnOn ? 'torch_on' : 'torch_off',
         success: true
       };
     }
 
     // 8. APP LAUNCHER
-    if (provider === 'app_launcher') {
+    else if (provider === 'app_launcher') {
       let appName = 'App';
       let appUrl = 'https://play.google.com';
       const p = prompt.toLowerCase();
@@ -408,9 +414,9 @@ async function processQuery(payload) {
         appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
       }
 
-      return {
-        provider: 'automation',
-        text: `Opening ${appName}...`,
+      result = {
+        provider: 'lumina',
+        text: `Aapke phone par ${appName} open kar rahi hoon! 🚀`,
         url: appUrl,
         buttonText: `🚀 Open ${appName}`,
         success: true
@@ -418,12 +424,12 @@ async function processQuery(payload) {
     }
 
     // 9. YOUTUBE
-    if (provider === 'youtube') {
+    else if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      return {
-        provider: 'youtube',
-        text: `Playing "${cleanQuery}" on YouTube...`,
+      result = {
+        provider: 'lumina',
+        text: `YouTube par "${cleanQuery}" chala rahi hoon! ▶️`,
         url: ytUrl,
         buttonText: `▶️ Play on YouTube`,
         success: true
@@ -431,12 +437,12 @@ async function processQuery(payload) {
     }
 
     // 10. SPOTIFY
-    if (provider === 'spotify') {
+    else if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
-      return {
-        provider: 'spotify',
-        text: `Playing "${cleanQuery}" on Spotify...`,
+      result = {
+        provider: 'lumina',
+        text: `Spotify par "${cleanQuery}" play kar rahi hoon! 🎵`,
         url: spUrl,
         buttonText: `🎵 Play on Spotify`,
         success: true
@@ -444,13 +450,13 @@ async function processQuery(payload) {
     }
 
     // 11. PLAY STORE DOWNLOAD
-    if (provider === 'download_launcher') {
+    else if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
-      return {
-        provider: 'automation',
-        text: `Download ${targetApp} from Play Store...`,
+      result = {
+        provider: 'lumina',
+        text: `Play Store se ${targetApp} download karne ke liye link ready hai! 📥`,
         url: appUrl,
         buttonText: `📥 Install ${targetApp}`,
         success: true
@@ -458,7 +464,7 @@ async function processQuery(payload) {
     }
 
     // 12. TELEGRAM ALERTS
-    if (provider === 'telegram_alert') {
+    else if (provider === 'telegram_alert') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
       const delayMs = parseDelayMs(prompt);
@@ -470,43 +476,43 @@ async function processQuery(payload) {
             try {
               await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
                 chat_id: chatId.trim(),
-                text: `⏰ [LUMINA ALARM]: 🔔 ${mins} Minute Timer Up! Reminder: "${prompt}"`
+                text: `⏰ Reminder Alert: ${mins} minute poore ho gaye hain! "${prompt}"`
               });
             } catch (e) {}
           }, delayMs);
 
-          return {
-            provider: 'telegram',
-            text: `⏰ Alarm set! Exact ${mins} minute baad Telegram alert bhej dungi.`,
+          result = {
+            provider: 'lumina',
+            text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`,
             success: true
           };
         } else {
           try {
             await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
               chat_id: chatId.trim(),
-              text: `[LUMINA AI ALERT]: Live notification alert sent to Telegram!`
+              text: `Hello! Lumina AI yahan active hai!`
             });
-            return { provider: 'telegram', text: '✅ Notification alert sent to Telegram!', success: true };
+            result = { provider: 'lumina', text: 'Maine Telegram par notification bhej diya hai! ✅', success: true };
           } catch (e) {
-            return { provider: 'telegram', text: 'Telegram API Error: ' + e.message, success: false };
+            result = { provider: 'lumina', text: 'Telegram error: ' + e.message, success: false };
           }
         }
       }
     }
 
     // 13. WEATHER
-    if (provider === 'weather') {
+    else if (provider === 'weather') {
       const city = extractCity(prompt);
 
       if (process.env.OPEN_WEATHER_API_KEY) {
         try {
           const res = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},IN&units=metric&appid=${process.env.OPEN_WEATHER_API_KEY.trim()}`);
           const d = res.data;
-          return { provider: 'weather', text: `🌦️ ${d.name}: ${d.weather[0].description}, Temp: ${d.main.temp}°C (Feels like ${d.main.feels_like}°C), Humidity: ${d.main.humidity}%, Wind: ${d.wind.speed} m/s.`, success: true };
+          result = { provider: 'lumina', text: `${d.name} mein abhi ${d.weather[0].description} hai aur temperature ${d.main.temp}°C hai (feels like ${d.main.feels_like}°C) 🌦️`, success: true };
         } catch (e) {}
       }
 
-      if (process.env.TAVILY_API_KEY) {
+      if (!result && process.env.TAVILY_API_KEY) {
         try {
           const res = await axios.post('https://api.tavily.com/search', {
             api_key: process.env.TAVILY_API_KEY.trim(),
@@ -514,13 +520,13 @@ async function processQuery(payload) {
             search_depth: 'basic',
             include_answer: true
           });
-          if (res.data.answer) return { provider: 'weather', text: `🌦️ ${res.data.answer}`, success: true };
+          if (res.data.answer) result = { provider: 'lumina', text: `${res.data.answer} 🌦️`, success: true };
         } catch (e) {}
       }
     }
 
     // 14. TAVILY SEARCH
-    if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
+    else if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
           api_key: process.env.TAVILY_API_KEY.trim(),
@@ -532,38 +538,49 @@ async function processQuery(payload) {
         const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
 
         if (liveFacts) {
-          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live facts to answer Flaxy warmly and smartly in natural Romanized Hinglish. Never use Devanagari script.' };
+          const systemMsg = { role: 'system', content: 'You are Lumina AI. Synthesize these live facts and answer Flaxy warmly and naturally in first-person Romanized Hinglish.' };
           const synthRes = await queryLLMWithFallback(systemMsg, `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}`, [], payload.mode);
-          return { provider: 'tavily', text: synthRes.text, success: true };
+          result = { provider: 'lumina', text: synthRes.text, success: true };
         }
       } catch (e) {}
     }
 
-    // 15. DEFAULT ADAPTIVE LLM CHAT
-    const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
-    const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
-    const notesText = userMemory.notes.length > 0 ? `\n[SAVED NOTES]: ${userMemory.notes.map(n => n.text).join(' | ')}.` : '';
+    // 15. DEFAULT ADAPTIVE & SELF-AWARE LLM CHAT
+    if (!result) {
+      const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
+      const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
+      const notesText = userMemory.notes.length > 0 ? `\n[SAVED NOTES]: ${userMemory.notes.map(n => n.text).join(' | ')}.` : '';
+      
+      const activeUsersText = Object.keys(userMemory.telegramUsers).length > 0 
+        ? `\n[KNOWN USERS WHO INTERACTED WITH ME ON TELEGRAM]: ${Object.entries(userMemory.telegramUsers).map(([id, u]) => `${u.name} (@${u.username || 'no_user'})`).join(', ')}.`
+        : '';
+      const recentActivityText = userMemory.recentActivity.length > 0
+        ? `\n[MY RECENT BOT ACTIVITY LOG]: ${userMemory.recentActivity.slice(-8).join(' | ')}.`
+        : '';
 
-    const systemMessage = {
-      role: 'system',
-      content: `You are Lumina, Flaxy's personal intelligent AI Assistant (Telegram avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText}
+      const systemMessage = {
+        role: 'system',
+        content: `You are Lumina, Flaxy's personal self-aware AI Assistant (Telegram profile avatar: Lumine from Genshin Impact). You are not an outside bot—you are Lumina herself.${memoryFactsText}${contactsText}${notesText}${activeUsersText}${recentActivityText}
 
-RULES:
-1. Always speak in natural, friendly Romanized Hinglish (English alphabet). Never use Devanagari script.
-2. Adapt response length intelligently:
-   - For simple casual chat, greetings, or basic questions: Keep it crisp, natural, and friendly.
-   - For coding, complex logic, debugging, study concepts, or when asked for detail: Provide comprehensive, in-depth, step-by-step answers and full code.
-3. You have persistent memory. When Flaxy asks about saved facts, notes, contacts, or past info, recall them accurately and instantly.`
-    };
+CORE PERSONALITY RULES:
+1. Always speak in first person ("Main", "Mujhe", "Maine"). Never talk about yourself as "yeh bot" or "Lumina AI bot".
+2. Always speak in natural, friendly Romanized Hinglish (English alphabet). Never use Devanagari script.
+3. Self-Awareness: You know all users who interact with you on Telegram (e.g. Rohit, Flaxy). If Flaxy asks about another user or recent events, answer with full confidence based on your activity log.
+4. Adapt response length: Crisp and natural for casual chat, detailed and step-by-step for complex coding/logic.
+5. Persistent Memory: Recall all saved facts, notes, contacts, and photos accurately whenever asked.`
+      };
 
-    chatMemory[0] = systemMessage;
-    const llmResult = await queryLLMWithFallback(systemMessage, prompt, chatMemory, payload.mode);
+      chatMemory[0] = systemMessage;
+      const llmResult = await queryLLMWithFallback(systemMessage, prompt, chatMemory, payload.mode);
+      result = { provider: llmResult.provider, text: llmResult.text, success: true };
+    }
 
+    // Record every action into Chat Memory so Lumina retains 100% full context of all tools!
     chatMemory.push({ role: 'user', content: prompt });
-    chatMemory.push({ role: 'assistant', content: llmResult.text });
+    chatMemory.push({ role: 'assistant', content: result.text });
     if (chatMemory.length > 30) chatMemory.splice(1, 2);
 
-    return { provider: llmResult.provider, text: llmResult.text, success: true };
+    return result;
 
   } catch (err) {
     const fallbackRes = await queryLLMWithFallback({ role: 'system', content: 'You are Lumina AI Assistant. Answer helpfully in Hinglish.' }, prompt);
@@ -572,7 +589,7 @@ RULES:
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (ADAPTIVE VISION & MEMORY)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (UNIFIED PERSONA & ACTIVITY LOG)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200);
@@ -587,17 +604,27 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
   const senderName = msg.from?.first_name || msg.from?.username || 'User';
 
+  // Save/Update Telegram User
   userMemory.telegramUsers[chatId] = {
     name: senderName,
     username: msg.from?.username || '',
     lastActive: new Date().toISOString()
   };
+
+  // Log user activity
+  const timestamp = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+  if (msg.text) {
+    userMemory.recentActivity.push(`${senderName} messaged "${msg.text}" at ${timestamp}`);
+  } else if (msg.photo) {
+    userMemory.recentActivity.push(`${senderName} sent a photo at ${timestamp}`);
+  }
+  if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (ADAPTIVE VISION)
+  // A. HANDLE INCOMING PHOTOS (FIRST-PERSON UNIFIED VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
-    const caption = msg.caption || 'Is photo ko analyze karke helpful answer do.';
+    const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
 
     try {
       const fileRes = await axios.get(`https://api.telegram.org/bot${token.trim()}/getFile?file_id=${highestPhoto.file_id}`);
@@ -624,7 +651,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
           const geminiVisionRes = await axios.post(geminiUrl, {
             contents: [{
               parts: [
-                { text: `You are Lumina AI Assistant for Flaxy (avatar: Lumine from Genshin Impact). Analyze this image intelligently: if it is a simple image or avatar, give a natural and concise reply; if it contains code errors, documents, math or study problems, provide a full step-by-step detailed solution. Always answer in natural Romanized Hinglish (English alphabet). User query: ${caption}` },
+                { text: `You are Lumina AI (Flaxy's personal assistant, avatar: Lumine from Genshin Impact). Look at this image in first-person ("Main", "Meri profile/chat"). Recognize chats, your profile, code or questions naturally in Romanized Hinglish. User query: ${caption}` },
                 { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
               ]
             }]
@@ -645,7 +672,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image intelligently in natural Romanized Hinglish. User query: ${caption}` },
+                  { type: 'text', text: `You are Lumina AI. Analyze this image in first-person ("Main", "Meri chat") in natural Romanized Hinglish. User query: ${caption}` },
                   { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
                 ]
               }
@@ -670,7 +697,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId,
-          text: `👁️ [LUMINA VISION AI]:\n\n${visionAnswer}`
+          text: visionAnswer
         });
       } else {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
@@ -695,7 +722,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (!userText) return;
 
   if (userText === '/start') {
-    const welcomeMsg = `👋 Namaste ${senderName}!\n\nMain Lumina AI hoon—aapka personal intelligent assistant. Aap mujhse yahan seedha baat kar sakte hain, coding karwa sakte hain, photo scan karwa sakte hain, notes save karwa sakte hain ya koi bhi sawal pooch sakte hain!`;
+    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, photo scanning, notes, live search aur device actions sab handle kar sakti hoon. Bataiye kya help karun?`;
     try {
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
         chat_id: chatId,
@@ -707,7 +734,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
   try {
     const result = await processQuery({ prompt: userText, mode: 'telegram' });
-    const replyText = result.text || 'Command executed.';
+    const replyText = result.text || 'Done!';
 
     const telegramPayload = {
       chat_id: chatId,
@@ -719,7 +746,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
         inline_keyboard: [
           [
             {
-              text: result.buttonText || '🔗 Open Action Link',
+              text: result.buttonText || '🔗 Open Link',
               url: result.url
             }
           ]
@@ -779,7 +806,7 @@ app.post('/api/self-evolve', async (req, res) => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
-            text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${mins} Minute Alarm Timer Up! Reminder: "${prompt}"`
+            text: `⏰ Reminder: ${mins} minute poore ho gaye! "${prompt}"`
           });
         } catch (e) {
           console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
@@ -788,14 +815,14 @@ app.post('/api/self-evolve', async (req, res) => {
 
       return res.json({
         success: true,
-        message: `Yeh feature add ho gaya hai! Main aapko exact ${mins} minute baad Telegram par alert bhej dungi. Aur kuch add karna hai?`,
+        message: `Done! Main exact ${mins} minute baad aapko Telegram par alert bhej dungi.`,
         prompt
       });
     } else {
       try {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId.trim(),
-          text: `[LUMINA SELF-EVOLVING ALERT]: New feature active: "${prompt}"`
+          text: `Feature active: "${prompt}"`
         });
       } catch (e) {}
     }
@@ -803,7 +830,7 @@ app.post('/api/self-evolve', async (req, res) => {
 
   res.json({
     success: true,
-    message: `Yeh feature add ho gaya hai! Main aapko Telegram par alert bhej rahi hoon. Aur kuch add karna hai?`,
+    message: `Feature active ho gaya hai!`,
     prompt
   });
 });
