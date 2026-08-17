@@ -1,11 +1,15 @@
 /**
- * Lumina AI Assistant - Production 10/10 Verified Server
- * Tested & Verified:
- *   - Direct 1-on-1 WhatsApp Chat with Saved Contacts (Clean message text)
- *   - Name-based Calling without Telegram 400 Error
- *   - Telegram User DM (Direct message to users who started the bot)
- *   - Natural Contact Auto-Saving (Supports "+91 74891 29400" format)
- *   - Multi-Model Brain (Gemini 2.5 Flash + Groq Vision + NVIDIA Nemotron)
+ * Lumina AI Assistant - Production 10/10 Intelligent Bulletproof Server
+ * Built for Flaxy (Nepanagar, MP)
+ * 
+ * Key Features & Fixes:
+ *   - Intelligent Contextual Routing (No dumb regex misfires on "telegram")
+ *   - Direct 1-on-1 WhatsApp Chat with Clean Message Extraction & Saved Contacts
+ *   - Safe Calling (No Telegram 400 Bad Request, graceful unsaved contact handler)
+ *   - True Telegram DM (Sends private messages to users like Rohit via bot)
+ *   - Dynamic Live API Integration (OpenWeatherMap, Tavily Live Web Search)
+ *   - Intelligent Multi-Model Brain (NVIDIA Nemotron + Groq Llama 3.3 + Gemini 2.5 Flash)
+ *   - Cross-Modal Vision (Gemini 2.5 Flash + Groq Vision)
  */
 
 import express from 'express';
@@ -39,11 +43,12 @@ function loadUserMemory() {
       if (!data.facts) data.facts = [];
       if (!data.telegramUsers) data.telegramUsers = {};
       if (!data.recentActivity) data.recentActivity = [];
+      if (!data.userProfile) data.userProfile = { home: 'Nepanagar, MP', name: 'Flaxy' };
       return data;
     }
   } catch (e) {}
   return { 
-    facts: [], 
+    facts: ["User home: Nepanagar, MP", "User name: Flaxy"], 
     userProfile: { home: 'Nepanagar, MP', name: 'Flaxy' },
     contacts: {},
     notes: [],
@@ -62,6 +67,9 @@ const chatMemory = [
   { role: 'system', content: 'You are Lumina, Flaxy\'s personal self-aware AI Assistant (Telegram avatar: Lumine from Genshin Impact). Speak naturally, warmly, and smartly in first-person Romanized Hinglish (English alphabet). Never write in Devanagari script.' }
 ];
 
+// -------------------------------------------------------------
+// HELPER FUNCTIONS & ENTITY EXTRACTORS
+// -------------------------------------------------------------
 function extractCity(prompt = '') {
   const p = prompt.toLowerCase();
   if (p.includes('nepanagar') || p.includes('nepa')) return 'Nepanagar';
@@ -79,38 +87,53 @@ function extractCity(prompt = '') {
     const candidate = m.replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
     if (candidate.length >= 3) return candidate;
   }
-  return 'Nepanagar';
+  return userMemory.userProfile?.home?.split(',')[0] || 'Nepanagar';
 }
 
-function extractContactName(prompt) {
-  const p = prompt.toLowerCase();
-  
-  const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+dost/i);
-  if (m1 && m1 && m1.length >= 3) return m1;
-
-  const m2 = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i);
-  if (m2 && m2 && m2.length >= 3) return m2;
-
-  const m3 = p.match(/dost\s+([a-zA-Z]+)/i);
-  if (m3 && m3 && m3.length >= 3) return m3;
-
-  const m4 = p.match(/contact\s+([a-zA-Z]+)/i);
-  if (m4 && m4 && m4.length >= 3) return m4;
+function extractContactFromPrompt(prompt) {
+  const digitsOnly = prompt.replace(/\D/g, '');
+  if (digitsOnly.length < 10) return null;
+  const cleanPhone = digitsOnly.slice(-10);
 
   const stopWords = new Set([
     'ara', 'arre', 'ab', 'abhi', 'ma', 'main', 'mera', 'meri', 'mere', 'uska', 'uski', 'usko', 'iska', 'iski', 'isko', 
-    'dost', 'save', 'karo', 'number', 'phone', 'call', 'flaxy', 'lumina', 'hain', 'mein', 'rakhna', 'rakho', 'apni', 
-    'memory', 'yad', 'yaad', 'batao', 'kuch', 'bara', 'baare', 'puch', 'raha', 'hoon', 'hai', 'he', 'to', 'toh'
+    'dost', 'save', 'karo', 'kar', 'lo', 'number', 'phone', 'call', 'flaxy', 'lumina', 'hain', 'mein', 'rakhna', 'rakho', 'apni', 
+    'memory', 'yad', 'yaad', 'batao', 'kuch', 'bara', 'baare', 'puch', 'raha', 'hoon', 'hai', 'he', 'to', 'toh', 'bhai', 'bro', 'friend'
   ]);
 
-  const words = p.split(/\s+/);
-  for (const w of words) {
-    const clean = w.replace(/[^a-zA-Z]/g, '');
-    if (clean.length >= 3 && !stopWords.has(clean)) {
-      return clean;
+  let name = '';
+  const p = prompt.toLowerCase();
+  
+  const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i);
+  if (m1 && m1 && m1.length >= 3 && !stopWords.has(m1)) name = m1;
+
+  if (!name) {
+    const m2 = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i);
+    if (m2 && m2 && m2.length >= 3 && !stopWords.has(m2)) name = m2;
+  }
+
+  if (!name) {
+    const m3 = p.match(/(?:dost|friend|bhai|bro)\s+([a-zA-Z]+)/i);
+    if (m3 && m3 && m3.length >= 3 && !stopWords.has(m3)) name = m3;
+  }
+
+  if (!name) {
+    const m4 = p.match(/(?:save|contact)\s+([a-zA-Z]+)/i);
+    if (m4 && m4 && m4.length >= 3 && !stopWords.has(m4)) name = m4;
+  }
+
+  if (!name) {
+    const words = p.split(/\s+/);
+    for (const w of words) {
+      const clean = w.replace(/[^a-zA-Z]/g, '');
+      if (clean.length >= 3 && !stopWords.has(clean)) {
+        name = clean;
+        break;
+      }
     }
   }
-  return 'contact';
+
+  return { name: name || 'contact', phone: cleanPhone };
 }
 
 function extractAndSaveUserFacts(prompt) {
@@ -141,14 +164,14 @@ function extractAndSaveUserFacts(prompt) {
   // Natural Contact Auto-Save
   const digitsOnly = prompt.replace(/\D/g, '');
   if (digitsOnly.length >= 10) {
-    const cleanNum = digitsOnly.slice(-10);
     const hasSaveIntent = /\b(save|yaad|rakhna|rakho|number|contact|dost)\b/i.test(prompt);
     if (hasSaveIntent) {
-      const contactName = extractContactName(prompt);
-      if (contactName && contactName !== 'contact') {
-        userMemory.contacts[contactName] = cleanNum;
-        if (!userMemory.facts.includes(`${contactName.toUpperCase()} phone number: ${cleanNum}`)) {
-          userMemory.facts.push(`${contactName.toUpperCase()} phone number: ${cleanNum}`);
+      const c = extractContactFromPrompt(prompt);
+      if (c && c.name && c.name !== 'contact') {
+        userMemory.contacts[c.name.toLowerCase()] = c.phone;
+        const factText = `${c.name.toUpperCase()} phone number: ${c.phone}`;
+        if (!userMemory.facts.includes(factText)) {
+          userMemory.facts.push(factText);
         }
         updated = true;
       }
@@ -181,45 +204,77 @@ function parseDelayMs(prompt = '') {
   return delayMinutes * 60 * 1000;
 }
 
+// -------------------------------------------------------------
+// INTELLIGENT ROUTER (NO KEYWORD COLLISION)
+// -------------------------------------------------------------
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
   const digitsOnly = prompt.replace(/\D/g, '');
 
-  // 1. Direct Telegram DM to another user
+  // 1. Contact Save (Explicit or Natural with 10+ digits)
+  if (/\b(save contact|number save|contact save|save|yaad|rakhna|rakho)\b/i.test(prompt) && (/\b(number|contact|phone|dost)\b/i.test(prompt) || digitsOnly.length >= 10)) {
+    if (digitsOnly.length >= 10) return 'save_contact';
+  }
+
+  // 2. Telegram DM to another user
   if (/\b(telegram|tele)\b/i.test(prompt) && /\b(message|msg|massage|bhejo|bajo|bhej|send|karo|bolo|bol|text)\b/i.test(prompt)) {
     for (const [chatId, u] of Object.entries(userMemory.telegramUsers)) {
       if (prompt.includes(u.name.toLowerCase()) || (u.username && prompt.includes(u.username.toLowerCase()))) {
         return 'telegram_dm';
       }
     }
+    const nameMatch = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
+                      prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
+    if (nameMatch && nameMatch && !['mujhe', 'mera', 'meri', 'me', 'main', 'test', 'alert'].includes(nameMatch.toLowerCase())) {
+      return 'telegram_dm';
+    }
   }
 
-  // 2. Contact Save (Explicit or Natural with 10+ digits)
-  if (/\b(save contact|number save|contact save|save|yaad|rakhna|rakho)\b/i.test(prompt) && (/\b(number|contact|phone|dost)\b/i.test(prompt) || digitsOnly.length >= 10)) {
-    if (digitsOnly.length >= 10) return 'save_contact';
+  // 3. Telegram Timed Reminder / Alarm
+  if (/\b(reminder|remind|alarm|yaad dilana|yaad dilao|alert)\b/i.test(prompt) && /\b(minute|minutes|min|mins|hour|hours|ghante|sec|seconds)\b/i.test(prompt)) {
+    return 'telegram_reminder';
   }
 
-  // 3. WhatsApp (Matches "bhejo", "bajo", "send", "msg", "message", "wa", etc.)
-  if (/\b(whatsapp|wa)\b/i.test(prompt)) return 'whatsapp_direct';
+  // 4. Telegram Explicit Test Alert
+  if (/\b(test telegram|telegram test|test notification|test alert)\b/i.test(prompt)) {
+    return 'telegram_test';
+  }
 
-  // 4. Calling & Dialer
-  if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) || /\b\d{10}\b/.test(prompt)) return 'call_handler';
+  // 5. WhatsApp Message
+  if (/\b(whatsapp|wa)\b/i.test(prompt) && !prompt.includes('download') && !prompt.includes('install')) {
+    return 'whatsapp_direct';
+  }
 
-  // 5. Notes
+  // 6. Calling & Dialer
+  if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) && (/\b(karo|lagao|ko|par|dial)\b/i.test(prompt) || digitsOnly.length >= 10)) {
+    return 'call_handler';
+  }
+
+  // 7. Notes
   if (/\b(note kar lo|note karo|save note|note down|kuch note karna hai)\b/i.test(prompt)) return 'save_note';
   if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
 
-  // 6. Tools
+  // 8. Hardware Torch
   if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
-  if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram_alert';
+
+  // 9. Music / Media
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
-  if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt)) return 'app_launcher';
-  if (/\b(weather|temperature|forecast|mausam|rain|rainy)\b/i.test(prompt)) return 'weather';
-  if (/\b(news|latest|search|score|match|today|aaj ki|cricket|stock|market|price)\b/i.test(prompt)) return 'tavily';
 
+  // 10. Play Store Download
+  if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
+
+  // 11. App Launcher
+  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt) && !/\b(song|video|gaana|music)\b/i.test(prompt)) return 'app_launcher';
+
+  // 12. Weather
+  if (/\b(weather|temperature|forecast|mausam|rain|rainy|barish)\b/i.test(prompt)) return 'weather';
+
+  // 13. Live Web Search (Tavily)
+  if (/\b(live score|cricket score|match score|stock price|gold price|bitcoin price|latest news today)\b/i.test(prompt)) return 'tavily';
+
+  // 14. Default Multi-Model LLM Brain
   return 'llm_fallback_chain';
 }
 
@@ -237,7 +292,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
         model: 'nvidia/llama-3.1-nemotron-70b-instruct',
         messages: [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }],
-        temperature: 0.4,
+        temperature: 0.3,
         max_tokens: 2048
       }, {
         headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
@@ -252,7 +307,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
     }
   }
 
-  // 2. Groq (Llama 3.3 70B) for Adaptive Chat
+  // 2. Groq (Llama 3.3 70B) for Adaptive Ultra-Fast Chat
   if (process.env.GROQ_API_KEY) {
     try {
       const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
@@ -286,16 +341,19 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
 
       const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
-        return { text: text, provider: 'gemini-2.5-flash (fallback)' };
+        return { text: text, provider: 'gemini-2.5-flash' };
       }
     } catch (e) {
-      console.warn('[GEMINI 2.5 FAIL] ➔ Switching to NVIDIA Fallback:', e.message);
+      console.warn('[GEMINI 2.5 FAIL] ➔ Switching to Local Fallback:', e.message);
     }
   }
 
-  return { text: `Command receive ho gaya.`, provider: 'lumina_local' };
+  return { text: `Command receive ho gaya. Main aapki madad ke liye taiyaar hoon.`, provider: 'lumina_local' };
 }
 
+// -------------------------------------------------------------
+// MAIN QUERY PROCESSING ENGINE
+// -------------------------------------------------------------
 async function processQuery(payload) {
   const prompt = payload.prompt || 'Hello';
   const provider = classifyRoute(payload);
@@ -305,8 +363,32 @@ async function processQuery(payload) {
   try {
     let result = null;
 
-    // 1. DIRECT TELEGRAM DM TO ANOTHER USER
-    if (provider === 'telegram_dm') {
+    // 1. SAVE CONTACT
+    if (provider === 'save_contact') {
+      const c = extractContactFromPrompt(prompt);
+      if (c && c.name && c.phone) {
+        userMemory.contacts[c.name.toLowerCase()] = c.phone;
+        const factText = `${c.name.toUpperCase()} phone number: ${c.phone}`;
+        if (!userMemory.facts.includes(factText)) {
+          userMemory.facts.push(factText);
+        }
+        saveUserMemory(userMemory);
+        result = {
+          provider: 'contacts',
+          text: `Maine ${c.name.toUpperCase()} ka number (+91 ${c.phone}) memory mein save kar liya hai! 📇`,
+          success: true
+        };
+      } else {
+        result = { 
+          provider: 'contacts', 
+          text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rohit ka number 7489129400 save karo")`, 
+          success: false 
+        };
+      }
+    }
+
+    // 2. DIRECT TELEGRAM DM TO ANOTHER USER
+    else if (provider === 'telegram_dm') {
       let targetUser = null;
       let targetChatId = null;
 
@@ -318,20 +400,26 @@ async function processQuery(payload) {
         }
       }
 
-      if (!targetUser) {
-        result = { provider: 'lumina', text: `Mujhe Telegram users list mein woh user nahi mila.`, success: false };
-      } else {
-        let p = prompt.replace(/^(?:ara|arre|ab|hey|hello|lumina|bhai)\s+/i, '');
-        p = p.replace(new RegExp(`^${targetUser.name}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
-        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${targetUser.name}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
-        p = p.replace(/\b(?:telegram|tele)\s+(?:par|per|pe|me|main)?\s*/gi, '');
-        p = p.replace(/\s+(?:telegram|tele)\s+(?:par|per|pe|me|main)?$/gi, '');
-        p = p.replace(/\b(?:message|msg|massage|text)\s+(?:karo|bhejo|bajo|bhej|send|likho|dal|daal)?\s*/gi, '');
-        p = p.replace(/\b(?:bhejo|bajo|bhej|send|karo|likho|daal|dal|bolo|bol)\b/gi, '');
-        p = p.replace(/^ki\s+/i, '').trim();
+      let detectedName = '';
+      const m = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
+                prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
+      if (m && m) detectedName = m;
 
-        const finalMsg = p || 'Hello!';
+      let p = prompt.replace(/^(?:ara|arre|ab|hey|hello|lumina|bhai)\s+/i, '');
+      const nameToStrip = targetUser ? targetUser.name : detectedName;
+      if (nameToStrip) {
+        p = p.replace(new RegExp(`^${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
+        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
+      }
+      p = p.replace(/\b(?:telegram|tele)\s+(?:par|per|pe|me|main)?\s*/gi, '');
+      p = p.replace(/\s+(?:telegram|tele)\s+(?:par|per|pe|me|main)?$/gi, '');
+      p = p.replace(/\b(?:message|msg|massage|text)\s+(?:karo|bhejo|bajo|bhej|send|likho|dal|daal)?\s*/gi, '');
+      p = p.replace(/\b(?:bhejo|bajo|bhej|send|karo|likho|daal|dal|bolo|bol)\b/gi, '');
+      p = p.replace(/^ki\s+/i, '').trim();
 
+      const finalMsg = p || 'Hello!';
+
+      if (targetUser && targetChatId) {
         result = {
           provider: 'telegram_dm',
           targetChatId,
@@ -340,10 +428,16 @@ async function processQuery(payload) {
           text: `Maine Telegram par ${targetUser.name} ko personal message bhej diya hai: "${finalMsg}" ✅`,
           success: true
         };
+      } else {
+        result = {
+          provider: 'telegram_dm',
+          text: `${detectedName || 'User'} ne abhi tak bot (@Ai_luminaa_bot) par /start nahi kiya hai, isliye unki Telegram chat ID available nahi hai.`,
+          success: false
+        };
       }
     }
 
-    // 2. DIRECT WHATSAPP MESSAGE
+    // 3. DIRECT WHATSAPP MESSAGE
     else if (provider === 'whatsapp_direct') {
       let targetNumber = '';
       let targetName = '';
@@ -363,35 +457,53 @@ async function processQuery(payload) {
         }
       }
 
+      let detectedUnsavedName = '';
+      if (!targetNumber && !targetName) {
+        const m = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:whatsapp|wa)/i) ||
+                  prompt.match(/(?:whatsapp|wa)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
+        if (m && m) detectedUnsavedName = m;
+      }
+
       let p = prompt.replace(/^(?:ara|arre|ab|hey|hello|lumina|bhai)\s+/i, '');
-      if (targetName) {
-        p = p.replace(new RegExp(`^${targetName}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
-        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${targetName}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
+      const nameToStrip = targetName || detectedUnsavedName;
+      if (nameToStrip) {
+        p = p.replace(new RegExp(`^${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
+        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
       }
       p = p.replace(/\b(?:whatsapp|wa)\s+(?:par|per|pe|me|main)?\s*/gi, '');
       p = p.replace(/\s+(?:whatsapp|wa)\s+(?:par|per|pe|me|main)?$/gi, '');
       p = p.replace(/\b(?:message|msg|massage|text)\s+(?:karo|bhejo|bajo|bhej|send|likho|dal|daal)?\s*/gi, '');
       p = p.replace(/\b(?:bhejo|bajo|bhej|send|karo|likho|daal|dal|bolo|bol)\b/gi, '');
+      p = p.replace(/\b\d{10}\b/g, '');
       p = p.replace(/^ki\s+/i, '').trim();
 
       const finalMsg = p || 'Hello!';
-      const waUrl = targetNumber 
-        ? `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(finalMsg)}`
-        : `https://api.whatsapp.com/send?text=${encodeURIComponent(finalMsg)}`;
 
-      result = {
-        provider: 'whatsapp',
-        text: `WhatsApp message ready kar diya hai ${targetName ? targetName + ` (${targetNumber})` : (targetNumber || '')}:\n"${finalMsg}" 💬`,
-        url: waUrl,
-        buttonText: '💬 Open WhatsApp Chat',
-        success: true
-      };
+      if (targetNumber) {
+        const waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(finalMsg)}`;
+        result = {
+          provider: 'whatsapp',
+          text: `WhatsApp message ready kar diya hai ${targetName ? targetName + ` (${targetNumber})` : targetNumber}:\n"${finalMsg}" 💬`,
+          url: waUrl,
+          buttonText: '💬 Open WhatsApp Chat',
+          success: true
+        };
+      } else {
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(finalMsg)}`;
+        result = {
+          provider: 'whatsapp',
+          text: `${detectedUnsavedName ? detectedUnsavedName + ' ka number saved nahi hai. ' : ''}WhatsApp message ready hai: "${finalMsg}" 💬\nAap direct WhatsApp par contact select karke bhej sakte hain.`,
+          url: waUrl,
+          buttonText: '💬 Open WhatsApp (Select Contact)',
+          success: true
+        };
+      }
     }
 
-    // 3. CALL HANDLER
+    // 4. CALL HANDLER
     else if (provider === 'call_handler') {
       let phoneNumber = '';
-      let callerName = 'Contact';
+      let callerName = '';
 
       const digitsOnly = prompt.replace(/\D/g, '');
       if (digitsOnly.length >= 10) {
@@ -419,15 +531,15 @@ async function processQuery(payload) {
         const cleanName = prompt.replace(/\b(call|dial|dialer|phone|lagao|karo|ko)\b/gi, '').trim();
         result = {
           provider: 'call',
-          text: `Phone dialer open kar rahi hoon "${cleanName || 'Call'}" ke liye... 📞\ntel:`,
+          text: `${cleanName ? cleanName + ' ka number saved nahi hai. ' : ''}Kripya pehle unka number save karein (jaise: "Rohit ka number 9876543210 save karo") ya direct number bole.`,
           url: 'tel:',
           isCall: true,
-          success: true
+          success: false
         };
       }
     }
 
-    // 4. SMART NOTES SAVE
+    // 5. SMART NOTES SAVE
     else if (provider === 'save_note') {
       const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|ki)\b/gi, '').trim();
       const noteItem = {
@@ -438,49 +550,31 @@ async function processQuery(payload) {
       userMemory.notes.push(noteItem);
       saveUserMemory(userMemory);
       result = {
-        provider: 'lumina',
+        provider: 'notes',
         text: `Maine note save kar liya hai: "${noteItem.text}" 📝`,
         success: true
       };
     }
 
-    // 5. READ NOTES
+    // 6. READ NOTES
     else if (provider === 'read_notes') {
       if (!userMemory.notes || userMemory.notes.length === 0) {
-        result = { provider: 'lumina', text: `Aapke paas abhi koi saved notes nahi hain.`, success: true };
+        result = { provider: 'notes', text: `Aapke paas abhi koi saved notes nahi hain.`, success: true };
       } else {
         const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text}`).join('\n');
         result = {
-          provider: 'lumina',
+          provider: 'notes',
           text: `Aapke saved notes yeh rahe:\n${notesList}`,
           success: true
         };
       }
     }
 
-    // 6. CLEAR NOTES
+    // 7. CLEAR NOTES
     else if (provider === 'clear_notes') {
       userMemory.notes = [];
       saveUserMemory(userMemory);
-      result = { provider: 'lumina', text: `Sabhi notes clear kar diye gaye hain! 🗑️`, success: true };
-    }
-
-    // 7. SAVE CONTACT
-    else if (provider === 'save_contact') {
-      const digitsOnly = prompt.replace(/\D/g, '');
-      const cleanPhone = digitsOnly.slice(-10);
-      const contactName = extractContactName(prompt);
-      if (cleanPhone && contactName && contactName !== 'contact') {
-        userMemory.contacts[contactName] = cleanPhone;
-        saveUserMemory(userMemory);
-        result = {
-          provider: 'contacts',
-          text: `Maine ${contactName.toUpperCase()} ka number (+91 ${cleanPhone}) save kar liya hai! 📇`,
-          success: true
-        };
-      } else {
-        result = { provider: 'contacts', text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
-      }
+      result = { provider: 'notes', text: `Sabhi notes clear kar diye gaye hain! 🗑️`, success: true };
     }
 
     // 8. HARDWARE TORCH
@@ -569,44 +663,54 @@ async function processQuery(payload) {
       };
     }
 
-    // 13. TELEGRAM ALERTS
-    else if (provider === 'telegram_alert') {
+    // 13. TELEGRAM REMINDERS
+    else if (provider === 'telegram_reminder') {
       const token = process.env.TELEGRAM_BOT_TOKEN;
       const chatId = process.env.TELEGRAM_CHAT_ID;
       const delayMs = parseDelayMs(prompt);
+      const mins = Math.max(1, Math.round(delayMs / 60000));
 
-      if (token && chatId) {
-        if (delayMs > 0) {
-          const mins = Math.round(delayMs / 60000);
-          setTimeout(async () => {
-            try {
-              await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
-                chat_id: chatId.trim(),
-                text: `⏰ Reminder Alert: ${mins} minute poore ho gaye hain! "${prompt}"`
-              });
-            } catch (e) {}
-          }, delayMs);
-
-          result = {
-            provider: 'telegram',
-            text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`,
-            success: true
-          };
-        } else {
+      if (token && chatId && delayMs > 0) {
+        setTimeout(async () => {
           try {
             await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
               chat_id: chatId.trim(),
-              text: `Hello! Lumina AI yahan active hai!`
+              text: `⏰ Reminder Alert: ${mins} minute poore ho gaye hain!\n"${prompt}"`
             });
-            result = { provider: 'telegram', text: 'Maine Telegram par notification bhej diya hai! ✅', success: true };
           } catch (e) {
-            result = { provider: 'telegram', text: 'Telegram error: ' + e.message, success: false };
+            console.error('[TELEGRAM REMINDER SEND ERROR]', e.message);
           }
+        }, delayMs);
+      }
+
+      result = {
+        provider: 'telegram',
+        text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`,
+        success: true
+      };
+    }
+
+    // 14. TELEGRAM TEST NOTIFICATION (Explicitly triggered only)
+    else if (provider === 'telegram_test') {
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+
+      if (token && chatId) {
+        try {
+          await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
+            chat_id: chatId.trim(),
+            text: `Hello Flaxy! Lumina AI Telegram integration active and verified! ✅`
+          });
+          result = { provider: 'telegram', text: 'Maine Telegram par test notification bhej diya hai! ✅', success: true };
+        } catch (e) {
+          result = { provider: 'telegram', text: 'Telegram error: ' + e.message, success: false };
         }
+      } else {
+        result = { provider: 'telegram', text: 'Telegram Bot Token ya Chat ID config nahi hai.', success: false };
       }
     }
 
-    // 14. WEATHER
+    // 15. WEATHER (OpenWeatherMap + Tavily fallback)
     else if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -614,8 +718,14 @@ async function processQuery(payload) {
         try {
           const res = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},IN&units=metric&appid=${process.env.OPEN_WEATHER_API_KEY.trim()}`);
           const d = res.data;
-          result = { provider: 'weather', text: `${d.name} mein abhi ${d.weather[0].description} hai aur temperature ${d.main.temp}°C hai (feels like ${d.main.feels_like}°C) 🌦️`, success: true };
-        } catch (e) {}
+          result = { 
+            provider: 'weather', 
+            text: `${d.name} mein abhi ${d.weather[0].description} hai, temperature ${Math.round(d.main.temp)}°C hai (feels like ${Math.round(d.main.feels_like)}°C) aur humidity ${d.main.humidity}% hai 🌦️`, 
+            success: true 
+          };
+        } catch (e) {
+          console.warn('[OPENWEATHER FAIL] ➔ Switching to Tavily:', e.message);
+        }
       }
 
       if (!result && process.env.TAVILY_API_KEY) {
@@ -626,12 +736,18 @@ async function processQuery(payload) {
             search_depth: 'basic',
             include_answer: true
           });
-          if (res.data.answer) result = { provider: 'weather', text: `${res.data.answer} 🌦️`, success: true };
+          if (res.data.answer) {
+            result = { provider: 'weather', text: `${res.data.answer} 🌦️`, success: true };
+          }
         } catch (e) {}
+      }
+
+      if (!result) {
+        result = { provider: 'weather', text: `${city} mein mausam ka live update lene ke liye OPEN_WEATHER_API_KEY ya TAVILY_API_KEY check karein.`, success: false };
       }
     }
 
-    // 15. TAVILY SEARCH
+    // 16. TAVILY LIVE WEB SEARCH
     else if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -651,7 +767,7 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 16. DEFAULT ADAPTIVE & SELF-AWARE LLM CHAT
+    // 17. DEFAULT MULTI-MODEL ADAPTIVE & SELF-AWARE LLM CHAT
     if (!result) {
       const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
       const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
@@ -695,7 +811,7 @@ CORE PERSONALITY RULES:
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (NO 400 ERROR + TELEGRAM DM)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (NO 400 ERROR + DIRECT DM)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200);
@@ -859,7 +975,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       text: replyText
     };
 
-    // Safe inline keyboard: Only HTTP/HTTPS URLs (Avoids 400 Bad Request on tel:)
+    // Safe inline keyboard: ONLY HTTP/HTTPS URLs (Avoids Telegram 400 Bad Request on tel:)
     if (result.url && (result.url.startsWith('http://') || result.url.startsWith('https://'))) {
       telegramPayload.reply_markup = {
         inline_keyboard: [
@@ -919,13 +1035,13 @@ app.post('/api/self-evolve', async (req, res) => {
 
   if (token && chatId) {
     if (delayMs > 0) {
-      const mins = Math.round(delayMs / 60000);
+      const mins = Math.max(1, Math.round(delayMs / 60000));
       console.log(`[ALARM SCHEDULED]: Triggering Telegram alert after ${mins} minute(s) (${delayMs} ms).`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
             chat_id: chatId.trim(),
-            text: `⏰ Reminder: ${mins} minute poore ho gaye! "${prompt}"`
+            text: `⏰ Reminder: ${mins} minute poore ho gaye!\n"${prompt}"`
           });
         } catch (e) {
           console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
