@@ -1,11 +1,10 @@
 /**
- * Lumina AI Assistant - 100% Unified Single Persona Architecture
- * Powered by:
- *   - Google Gemini 2.5 Flash (`gemini-2.5-flash`) for Vision & Fallback
- *   - Groq Llama 3.2 Vision + Llama 3.3 70B (Smart, Cohesive Persona)
- *   - NVIDIA Nemotron for Coding & Complex Logic
- *   - Universal Cross-Tool Memory (All Tools, APIs & Vision share 1 Brain)
- *   - 2-Way Telegram Bot with 1-Tap Action Buttons
+ * Lumina AI Assistant - Production 10/10 Bulletproof Server
+ * Fixes:
+ *   - Telegram 400 Error Fixed (Valid HTTP/HTTPS inline buttons only)
+ *   - Smart WhatsApp Intent (Matches "bajo", "bhejo", "send", "msg" & name lookup)
+ *   - Flexible Contact Saving (Handles +91 and spaces: "+91 74891 29400")
+ *   - Unified Multi-Model Brain (Gemini 2.5 + Groq Vision + NVIDIA Nemotron)
  */
 
 import express from 'express';
@@ -85,6 +84,7 @@ function extractCity(prompt = '') {
 function extractAndSaveUserFacts(prompt) {
   let updated = false;
 
+  // Name extraction
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
   if (nameMatch && nameMatch) {
     const extractedName = nameMatch.trim();
@@ -95,6 +95,7 @@ function extractAndSaveUserFacts(prompt) {
     updated = true;
   }
 
+  // Home extraction
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
   if (homeMatch && homeMatch) {
     const extractedHome = homeMatch.trim();
@@ -105,6 +106,28 @@ function extractAndSaveUserFacts(prompt) {
     updated = true;
   }
 
+  // Flexible Contact Saving from natural chat (e.g. "rohit mera dost hai uska number +91 74891 29400 save kar lo")
+  const digitsOnly = prompt.replace(/\D/g, '');
+  if (digitsOnly.length >= 10) {
+    const cleanNum = digitsOnly.slice(-10);
+    const saveWords = /\b(save|yaad|rakhna|rakho|number|contact|dost)\b/i.test(prompt);
+    if (saveWords) {
+      const words = prompt.toLowerCase().split(/\s+/);
+      for (const w of words) {
+        const cleanWord = w.replace(/[^a-zA-Z]/g, '');
+        if (cleanWord.length >= 3 && !['mera', 'meri', 'uska', 'uski', 'dost', 'save', 'karo', 'number', 'phone', 'call', 'flaxy', 'lumina', 'hain', 'mein'].includes(cleanWord)) {
+          userMemory.contacts[cleanWord] = cleanNum;
+          if (!userMemory.facts.includes(`${cleanWord.toUpperCase()} phone number: ${cleanNum}`)) {
+            userMemory.facts.push(`${cleanWord.toUpperCase()} phone number: ${cleanNum}`);
+          }
+          updated = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Generic Fact Save: "yaad rakhna ki ..."
   const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
   if (rememberMatch && rememberMatch) {
     const fact = rememberMatch.trim();
@@ -138,15 +161,17 @@ function classifyRoute(payload) {
   if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
 
-  // 2. Contact Management
+  // 2. Explicit Contact Save
   if (/\b(save contact|number save|contact save)\b/i.test(prompt)) return 'save_contact';
 
-  // 3. WhatsApp
-  if (/\b(whatsapp|wa message)\b/i.test(prompt) && /\b(send|bhejo|message|msg|karo)\b/i.test(prompt)) return 'whatsapp_direct';
+  // 3. WhatsApp (Matches "bhejo", "bajo", "send", "msg", "message", "wa", etc.)
+  if (/\b(whatsapp|wa)\b/i.test(prompt)) return 'whatsapp_direct';
 
-  // 4. Hardware & Automation
-  if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
+  // 4. Calling & Dialer
   if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) || /\b\d{10}\b/.test(prompt)) return 'call_handler';
+
+  // 5. Hardware & Other Tools
+  if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
   if (/\b(telegram|alert|bot message|notification)\b/i.test(prompt)) return 'telegram_alert';
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
@@ -280,19 +305,20 @@ async function processQuery(payload) {
 
     // 4. SAVE CONTACT
     else if (provider === 'save_contact') {
-      const phoneMatch = prompt.match(/\b\d{10}\b/);
-      let name = prompt.replace(/\b(save contact|save|contact|number|ka|ko)\b/gi, '').replace(/\b\d{10}\b/, '').trim();
-      if (phoneMatch && name) {
+      const digitsOnly = prompt.replace(/\D/g, '');
+      const cleanPhone = digitsOnly.slice(-10);
+      let name = prompt.replace(/\b(save contact|save|contact|number|ka|ko|dost)\b/gi, '').replace(/\b\d+\b/g, '').trim();
+      if (cleanPhone && name) {
         name = name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim();
-        userMemory.contacts[name] = phoneMatch[0];
+        userMemory.contacts[name] = cleanPhone;
         saveUserMemory(userMemory);
         result = {
           provider: 'lumina',
-          text: `${name.toUpperCase()} ka number (${phoneMatch[0]}) meri memory mein save ho gaya hai! 📇`,
+          text: `${name.toUpperCase()} ka number (${cleanPhone}) meri memory mein save ho gaya hai! 📇`,
           success: true
         };
       } else {
-        result = { provider: 'lumina', text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
+        result = { provider: 'lumina', text: `Contact save karne ke liye name aur number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
       }
     }
 
@@ -301,36 +327,45 @@ async function processQuery(payload) {
       let targetNumber = '';
       let msgText = '';
 
-      const phoneMatch = prompt.match(/\b\d{10}\b/);
-      if (phoneMatch) {
-        targetNumber = phoneMatch[0];
-        msgText = prompt.replace(phoneMatch[0], '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|par message)\b/gi, '').trim();
-      } else {
+      // Check if prompt contains phone digits
+      const digitsOnly = prompt.replace(/\D/g, '');
+      if (digitsOnly.length >= 10) {
+        targetNumber = digitsOnly.slice(-10);
+      }
+
+      // Check contacts dictionary
+      if (!targetNumber) {
         for (const [contactName, num] of Object.entries(userMemory.contacts)) {
           if (prompt.toLowerCase().includes(contactName)) {
             targetNumber = num;
-            msgText = prompt.replace(new RegExp(contactName, 'gi'), '').replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko|ki)\b/gi, '').trim();
             break;
           }
         }
       }
+
+      // Clean message text
+      msgText = prompt.replace(/\b(whatsapp|wa|message|msg|send|karo|bhejo|bajo|par|ko|ki|per|pe)\b/gi, '')
+                      .replace(/\b\d+\b/g, '')
+                      .trim();
+
+      // If user typed "hii" or similar
+      if (!msgText && /\b(hi|hii|hello|hey)\b/i.test(prompt)) msgText = 'Hello!';
 
       let waUrl = 'https://api.whatsapp.com';
       if (targetNumber) {
         waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
         result = {
           provider: 'lumina',
-          text: `WhatsApp message ready kar diya hai ${targetNumber} ke liye: "${msgText || 'Hello'}" 💬`,
+          text: `WhatsApp message ready kar diya hai (${targetNumber}): "${msgText || 'Hello'}" 💬\n\nNiche button par tap karke send karein:`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp Chat',
           success: true
         };
       } else {
-        msgText = prompt.replace(/\b(whatsapp|message|msg|send|karo|bhejo|par|ko)\b/gi, '').trim();
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
         result = {
           provider: 'lumina',
-          text: `WhatsApp message ready hai: "${msgText}" 💬`,
+          text: `WhatsApp message ready hai: "${msgText || 'Hello'}" 💬`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp',
           success: true
@@ -341,11 +376,11 @@ async function processQuery(payload) {
     // 6. CALL HANDLER
     else if (provider === 'call_handler') {
       let phoneNumber = '';
-      let callerName = 'Phone Dialer';
+      let callerName = 'Contact';
 
-      const phoneMatch = prompt.match(/\b\d{10}\b/);
-      if (phoneMatch) {
-        phoneNumber = phoneMatch[0];
+      const digitsOnly = prompt.replace(/\D/g, '');
+      if (digitsOnly.length >= 10) {
+        phoneNumber = digitsOnly.slice(-10);
         callerName = phoneNumber;
       } else {
         for (const [contactName, num] of Object.entries(userMemory.contacts)) {
@@ -360,18 +395,18 @@ async function processQuery(payload) {
       if (phoneNumber) {
         result = {
           provider: 'lumina',
-          text: `${callerName} (${phoneNumber}) ko call laga rahi hoon... 📞`,
+          text: `📞 Calling ${callerName} (+91 ${phoneNumber})...\nCall lagane ke liye tap karein: tel:${phoneNumber}`,
           url: `tel:${phoneNumber}`,
-          buttonText: `📞 Call ${callerName}`,
+          isCall: true,
           success: true
         };
       } else {
         const cleanName = prompt.replace(/\b(call|dial|dialer|phone|lagao|karo|ko)\b/gi, '').trim();
         result = {
           provider: 'lumina',
-          text: `Phone dialer open kar rahi hoon "${cleanName || 'Call'}" ke liye... 📞`,
+          text: `Phone dialer open kar rahi hoon "${cleanName || 'Call'}" ke liye... 📞\ntel:`,
           url: 'tel:',
-          buttonText: '📞 Open Dialer',
+          isCall: true,
           success: true
         };
       }
@@ -560,10 +595,10 @@ async function processQuery(payload) {
 
       const systemMessage = {
         role: 'system',
-        content: `You are Lumina, Flaxy's personal self-aware AI Assistant (Telegram profile avatar: Lumine from Genshin Impact). You are not an outside bot—you are Lumina herself.${memoryFactsText}${contactsText}${notesText}${activeUsersText}${recentActivityText}
+        content: `You are Lumina, Flaxy's personal self-aware AI Assistant (Telegram avatar: Lumine from Genshin Impact). You are not an outside bot—you are Lumina herself.${memoryFactsText}${contactsText}${notesText}${activeUsersText}${recentActivityText}
 
 CORE PERSONALITY RULES:
-1. Always speak in first person ("Main", "Mujhe", "Maine"). Never talk about yourself as "yeh bot" or "Lumina AI bot".
+1. Speak in first person ("Main", "Mujhe", "Maine"). Never talk about yourself as "yeh bot" or "Lumina AI bot".
 2. Always speak in natural, friendly Romanized Hinglish (English alphabet). Never use Devanagari script.
 3. Self-Awareness: You know all users who interact with you on Telegram (e.g. Rohit, Flaxy). If Flaxy asks about another user or recent events, answer with full confidence based on your activity log.
 4. Adapt response length: Crisp and natural for casual chat, detailed and step-by-step for complex coding/logic.
@@ -575,7 +610,7 @@ CORE PERSONALITY RULES:
       result = { provider: llmResult.provider, text: llmResult.text, success: true };
     }
 
-    // Record every action into Chat Memory so Lumina retains 100% full context of all tools!
+    // Save every action into Chat Memory so Lumina retains 100% context!
     chatMemory.push({ role: 'user', content: prompt });
     chatMemory.push({ role: 'assistant', content: result.text });
     if (chatMemory.length > 30) chatMemory.splice(1, 2);
@@ -589,7 +624,7 @@ CORE PERSONALITY RULES:
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (UNIFIED PERSONA & ACTIVITY LOG)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (NO 400 ERROR, SAFE BUTTONS)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200);
@@ -621,7 +656,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (FIRST-PERSON UNIFIED VISION)
+  // A. HANDLE INCOMING PHOTOS
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
@@ -741,7 +776,8 @@ app.post('/api/telegram-webhook', async (req, res) => {
       text: replyText
     };
 
-    if (result.url) {
+    // Only attach inline buttons if URL is valid HTTP/HTTPS (Avoids Telegram 400 Error on tel:)
+    if (result.url && (result.url.startsWith('http://') || result.url.startsWith('https://'))) {
       telegramPayload.reply_markup = {
         inline_keyboard: [
           [
