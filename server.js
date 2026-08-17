@@ -1,12 +1,11 @@
 /**
- * Lumina AI Assistant - Unified Memory & Single Personality Server
+ * Lumina AI Assistant - Adaptive Intelligence & Balanced Server
  * Powered by:
  *   - Google Gemini 2.5 Flash (`gemini-2.5-flash`) for Vision & Fallback
- *   - Groq Llama 3.2 Vision (`llama-3.2-11b-vision-preview`) + Llama 3.3 70B
- *   - NVIDIA Nemotron (`nvidia/llama-3.1-nemotron-70b-instruct`) for Coding & Reasoning
- *   - Unified Cross-Modal Memory (Vision + Chat share exact same memory)
+ *   - Groq Llama 3.2 Vision + Llama 3.3 70B (Adaptive Smart Chat)
+ *   - NVIDIA Nemotron for Deep Coding & Complex Logic
+ *   - Persistent Memory & Instant Recall (`lumina_user_memory.json`)
  *   - 2-Way Telegram Bot with 1-Tap Action Buttons
- *   - Smart Notes, Contact Book, WhatsApp, Torch, Weather & Tavily Search
  */
 
 import express from 'express';
@@ -37,6 +36,7 @@ function loadUserMemory() {
       const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
       if (!data.contacts) data.contacts = {};
       if (!data.notes) data.notes = [];
+      if (!data.facts) data.facts = [];
       if (!data.telegramUsers) data.telegramUsers = {};
       return data;
     }
@@ -57,7 +57,7 @@ function saveUserMemory(memoryData) {
 let userMemory = loadUserMemory();
 
 const chatMemory = [
-  { role: 'system', content: 'You are Lumina, a highly intelligent personal AI Assistant for Flaxy (avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync. Always speak warmly, confidently, and helpfully strictly in Romanized Hinglish (English alphabet). Never write in Devanagari script.' }
+  { role: 'system', content: 'You are Lumina, Flaxy\'s personal intelligent AI Assistant (avatar: Lumine from Genshin Impact). Always speak warmly and smartly in natural Romanized Hinglish (English alphabet). Adapt your answer length intelligently based on the task.' }
 ];
 
 function extractCity(prompt = '') {
@@ -82,6 +82,7 @@ function extractCity(prompt = '') {
 
 function extractAndSaveUserFacts(prompt) {
   let updated = false;
+
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
   if (nameMatch && nameMatch) {
     const extractedName = nameMatch.trim();
@@ -91,6 +92,7 @@ function extractAndSaveUserFacts(prompt) {
     }
     updated = true;
   }
+
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
   if (homeMatch && homeMatch) {
     const extractedHome = homeMatch.trim();
@@ -100,6 +102,16 @@ function extractAndSaveUserFacts(prompt) {
     }
     updated = true;
   }
+
+  const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
+  if (rememberMatch && rememberMatch) {
+    const fact = rememberMatch.trim();
+    if (fact && !userMemory.facts.includes(fact)) {
+      userMemory.facts.push(fact);
+      updated = true;
+    }
+  }
+
   if (updated) saveUserMemory(userMemory);
 }
 
@@ -120,14 +132,14 @@ function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
 
   // 1. Smart Notes Management
-  if (/\b(note kar lo|note karo|save note|note down|yaad rakhna)\b/i.test(prompt)) return 'save_note';
-  if (/\b(mere notes|show notes|read notes|kya note kiya|list notes)\b/i.test(prompt)) return 'read_notes';
+  if (/\b(note kar lo|note karo|save note|note down|kuch note karna hai)\b/i.test(prompt)) return 'save_note';
+  if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
 
-  // 2. Contact Management (Save Contact)
+  // 2. Contact Management
   if (/\b(save contact|number save|contact save)\b/i.test(prompt)) return 'save_contact';
 
-  // 3. WhatsApp Direct Intent
+  // 3. WhatsApp
   if (/\b(whatsapp|wa message)\b/i.test(prompt) && /\b(send|bhejo|message|msg|karo)\b/i.test(prompt)) return 'whatsapp_direct';
 
   // 4. Hardware & Automation
@@ -152,7 +164,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
 
   const shouldPreferNvidia = preferMode === 'nvidia' || isCodingOrReasoning;
 
-  // 1. Primary for Coding & Deep Reasoning: NVIDIA Nemotron
+  // 1. NVIDIA Nemotron for Coding & Complex Logic
   if (shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
     try {
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -169,18 +181,19 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
         return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
       }
     } catch (e) {
-      console.warn('[NVIDIA API FAIL] ➔ Falling back to Groq/Gemini:', e.message);
+      console.warn('[NVIDIA API FAIL] ➔ Falling back:', e.message);
     }
   }
 
-  // 2. Primary for Casual Chat & General Speed: Groq (Llama 3.3 70B)
+  // 2. Groq (Llama 3.3 70B) for Adaptive Chat
   if (process.env.GROQ_API_KEY) {
     try {
       const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
       const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
         model: 'llama-3.3-70b-versatile',
         messages: messages,
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 1500
       }, {
         headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` },
         timeout: 15000
@@ -190,11 +203,11 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
         return { text: res.data.choices[0].message.content, provider: 'groq' };
       }
     } catch (e) {
-      console.warn('[GROQ API FAIL/LIMIT] ➔ Switching to Gemini Fallback:', e.message);
+      console.warn('[GROQ API FAIL] ➔ Switching to Gemini Fallback:', e.message);
     }
   }
 
-  // 3. First Fallback: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+  // 3. Gemini 2.5 Flash Fallback
   if (process.env.GEMINI_API_KEY) {
     try {
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
@@ -213,28 +226,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = [], preferM
     }
   }
 
-  // 4. Secondary Backup: NVIDIA Nemotron
-  if (!shouldPreferNvidia && process.env.NVIDIA_API_KEY) {
-    try {
-      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-        messages: [systemMsg, { role: 'user', content: userPrompt }],
-        temperature: 0.6,
-        max_tokens: 1024
-      }, {
-        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
-        timeout: 15000
-      });
-
-      if (res.data?.choices?.[0]?.message?.content) {
-        return { text: res.data.choices[0].message.content, provider: 'nvidia (fallback)' };
-      }
-    } catch (e) {
-      console.warn('[NVIDIA BACKUP FAIL]:', e.message);
-    }
-  }
-
-  return { text: `Lumina: Command "${userPrompt}" receive ho gaya hai.`, provider: 'lumina_local' };
+  return { text: `Lumina: Command receive ho gaya.`, provider: 'lumina_local' };
 }
 
 async function processQuery(payload) {
@@ -246,7 +238,7 @@ async function processQuery(payload) {
   try {
     // 1. SMART NOTES SAVE
     if (provider === 'save_note') {
-      const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|yaad rakhna|ki)\b/gi, '').trim();
+      const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|ki)\b/gi, '').trim();
       const noteItem = {
         id: Date.now(),
         text: cleanNote || prompt,
@@ -256,7 +248,7 @@ async function processQuery(payload) {
       saveUserMemory(userMemory);
       return {
         provider: 'memory',
-        text: `📝 [SMART NOTES]: Note save kar liya gaya hai:\n"${noteItem.text}" (${noteItem.date})`,
+        text: `📝 Note save ho gaya: "${noteItem.text}"`,
         success: true
       };
     }
@@ -264,12 +256,12 @@ async function processQuery(payload) {
     // 2. READ NOTES
     if (provider === 'read_notes') {
       if (!userMemory.notes || userMemory.notes.length === 0) {
-        return { provider: 'memory', text: `📝 [SMART NOTES]: Aapke paas abhi koi saved notes nahi hain.`, success: true };
+        return { provider: 'memory', text: `📝 Aapke paas abhi koi saved notes nahi hain.`, success: true };
       }
-      const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text} [${n.date}]`).join('\n');
+      const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text}`).join('\n');
       return {
         provider: 'memory',
-        text: `📝 [SAVED NOTES & REMINDERS]:\n${notesList}`,
+        text: `📝 Aapke Saved Notes:\n${notesList}`,
         success: true
       };
     }
@@ -278,7 +270,7 @@ async function processQuery(payload) {
     if (provider === 'clear_notes') {
       userMemory.notes = [];
       saveUserMemory(userMemory);
-      return { provider: 'memory', text: `🗑️ [SMART NOTES]: Sabhi notes clear kar diye gaye hain.`, success: true };
+      return { provider: 'memory', text: `🗑️ Sabhi notes clear kar diye gaye hain.`, success: true };
     }
 
     // 4. SAVE CONTACT
@@ -291,11 +283,11 @@ async function processQuery(payload) {
         saveUserMemory(userMemory);
         return {
           provider: 'contacts',
-          text: `📇 [CONTACT BOOK]: ${name.toUpperCase()} ka number (${phoneMatch[0]}) successfully save ho gaya hai!`,
+          text: `📇 ${name.toUpperCase()} ka number (${phoneMatch[0]}) save ho gaya!`,
           success: true
         };
       }
-      return { provider: 'contacts', text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
+      return { provider: 'contacts', text: `Contact save karne ke liye name aur number bataiye (Jaise: "Rahul ka number 9876543210 save karo")`, success: false };
     }
 
     // 5. DIRECT WHATSAPP MESSAGE
@@ -322,7 +314,7 @@ async function processQuery(payload) {
         waUrl = `https://api.whatsapp.com/send?phone=91${targetNumber}&text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
           provider: 'whatsapp',
-          text: `💬 [WHATSAPP ENGINE]: WhatsApp message ready for ${targetNumber}:\n"${msgText || 'Hello'}"`,
+          text: `💬 WhatsApp message ready for ${targetNumber}: "${msgText || 'Hello'}"`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp Chat',
           success: true
@@ -332,7 +324,7 @@ async function processQuery(payload) {
         waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgText || 'Hello')}`;
         return {
           provider: 'whatsapp',
-          text: `💬 [WHATSAPP ENGINE]: WhatsApp message ready:\n"${msgText}"`,
+          text: `💬 WhatsApp message ready: "${msgText}"`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp',
           success: true
@@ -362,7 +354,7 @@ async function processQuery(payload) {
       if (phoneNumber) {
         return {
           provider: 'automation',
-          text: `📞 [DEVICE AUTOMATION]: Ready to call ${callerName} (${phoneNumber})...`,
+          text: `📞 Calling ${callerName} (${phoneNumber})...`,
           url: `tel:${phoneNumber}`,
           buttonText: `📞 Call ${callerName}`,
           success: true
@@ -371,7 +363,7 @@ async function processQuery(payload) {
         const cleanName = prompt.replace(/\b(call|dial|dialer|phone|lagao|karo|ko)\b/gi, '').trim();
         return {
           provider: 'automation',
-          text: `📞 [DEVICE AUTOMATION]: Opening Phone Dialer for "${cleanName || 'Call'}"...`,
+          text: `📞 Opening Dialer for "${cleanName || 'Call'}"...`,
           url: 'tel:',
           buttonText: '📞 Open Dialer',
           success: true
@@ -384,7 +376,7 @@ async function processQuery(payload) {
       const turnOn = !prompt.toLowerCase().includes('off') && !prompt.toLowerCase().includes('band');
       return {
         provider: 'hardware',
-        text: `[DEVICE HARDWARE]: Flashlight Torch ${turnOn ? 'ON' : 'OFF'} kar diya gaya hai!`,
+        text: `[DEVICE HARDWARE]: Flashlight Torch ${turnOn ? 'ON' : 'OFF'}!`,
         action: turnOn ? 'torch_on' : 'torch_off',
         success: true
       };
@@ -418,7 +410,7 @@ async function processQuery(payload) {
 
       return {
         provider: 'automation',
-        text: `[DEVICE AUTOMATION]: Launching ${appName}...`,
+        text: `Opening ${appName}...`,
         url: appUrl,
         buttonText: `🚀 Open ${appName}`,
         success: true
@@ -431,7 +423,7 @@ async function processQuery(payload) {
       const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
       return {
         provider: 'youtube',
-        text: `[YOUTUBE ENGINE]: Searching and playing "${cleanQuery}" on YouTube...`,
+        text: `Playing "${cleanQuery}" on YouTube...`,
         url: ytUrl,
         buttonText: `▶️ Play on YouTube`,
         success: true
@@ -444,7 +436,7 @@ async function processQuery(payload) {
       const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
       return {
         provider: 'spotify',
-        text: `[SPOTIFY ENGINE]: Playing "${cleanQuery}" on Spotify...`,
+        text: `Playing "${cleanQuery}" on Spotify...`,
         url: spUrl,
         buttonText: `🎵 Play on Spotify`,
         success: true
@@ -458,7 +450,7 @@ async function processQuery(payload) {
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
       return {
         provider: 'automation',
-        text: `[PLAY STORE DOWNLOADER]: Download ${targetApp} from Play Store...`,
+        text: `Download ${targetApp} from Play Store...`,
         url: appUrl,
         buttonText: `📥 Install ${targetApp}`,
         success: true
@@ -478,23 +470,23 @@ async function processQuery(payload) {
             try {
               await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
                 chat_id: chatId.trim(),
-                text: `⏰ [LUMINA ALARM ALERT]: 🔔 ${mins} Minute Alarm Timer Up! Reminder: "${prompt}"`
+                text: `⏰ [LUMINA ALARM]: 🔔 ${mins} Minute Timer Up! Reminder: "${prompt}"`
               });
             } catch (e) {}
           }, delayMs);
 
           return {
             provider: 'telegram',
-            text: `⏰ [LUMINA ALARM ENGINE]: Alarm set successfully! Main exact ${mins} minute baad aapke Telegram bot @Ai_luminaa_bot par alert bhej dungi.`,
+            text: `⏰ Alarm set! Exact ${mins} minute baad Telegram alert bhej dungi.`,
             success: true
           };
         } else {
           try {
             await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
               chat_id: chatId.trim(),
-              text: `[LUMINA AI ALERT]: Hello! Lumina AI Assistant has successfully sent a live notification alert to your Telegram!`
+              text: `[LUMINA AI ALERT]: Live notification alert sent to Telegram!`
             });
-            return { provider: 'telegram', text: '✅ [TELEGRAM ENGINE]: Live notification alert sent successfully to your Telegram bot @Ai_luminaa_bot!', success: true };
+            return { provider: 'telegram', text: '✅ Notification alert sent to Telegram!', success: true };
           } catch (e) {
             return { provider: 'telegram', text: 'Telegram API Error: ' + e.message, success: false };
           }
@@ -510,7 +502,7 @@ async function processQuery(payload) {
         try {
           const res = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},IN&units=metric&appid=${process.env.OPEN_WEATHER_API_KEY.trim()}`);
           const d = res.data;
-          return { provider: 'weather', text: `[LUMINA WEATHER]: Forecast for ${d.name}, Madhya Pradesh, India: ${d.weather[0].description}, Temp: ${d.main.temp}°C (Feels like ${d.main.feels_like}°C), Humidity: ${d.main.humidity}%, Wind: ${d.wind.speed} m/s.`, success: true };
+          return { provider: 'weather', text: `🌦️ ${d.name}: ${d.weather[0].description}, Temp: ${d.main.temp}°C (Feels like ${d.main.feels_like}°C), Humidity: ${d.main.humidity}%, Wind: ${d.wind.speed} m/s.`, success: true };
         } catch (e) {}
       }
 
@@ -522,7 +514,7 @@ async function processQuery(payload) {
             search_depth: 'basic',
             include_answer: true
           });
-          if (res.data.answer) return { provider: 'weather', text: `[LUMINA LIVE WEATHER]: ${res.data.answer}`, success: true };
+          if (res.data.answer) return { provider: 'weather', text: `🌦️ ${res.data.answer}`, success: true };
         } catch (e) {}
       }
     }
@@ -540,21 +532,28 @@ async function processQuery(payload) {
         const liveFacts = searchRes.data.answer || searchRes.data.results?.map(r => r.content).join('\n') || '';
 
         if (liveFacts) {
-          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live real-time web search facts to answer the user question warmly and accurately strictly in Romanized Hinglish (English letters). Never use Devanagari script.' };
+          const systemMsg = { role: 'system', content: 'You are Lumina AI Assistant. Synthesize these live facts to answer Flaxy warmly and smartly in natural Romanized Hinglish. Never use Devanagari script.' };
           const synthRes = await queryLLMWithFallback(systemMsg, `User Prompt: ${prompt}\nLive Web Facts: ${liveFacts}`, [], payload.mode);
-          return { provider: 'tavily', text: `[LUMINA LIVE WEB SEARCH]: ${synthRes.text}`, success: true };
+          return { provider: 'tavily', text: synthRes.text, success: true };
         }
       } catch (e) {}
     }
 
-    // 15. DEFAULT LLM CHAT (NVIDIA / GROQ / GEMINI 2.5)
-    const memoryFactsText = userMemory.facts.length > 0 ? ` SAVED USER PROFILE & IMPORTANT FACTS: [${userMemory.facts.join('; ')}].` : '';
-    const contactsText = Object.keys(userMemory.contacts).length > 0 ? ` SAVED CONTACTS: [${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}].` : '';
-    const notesText = userMemory.notes.length > 0 ? ` USER SAVED NOTES: [${userMemory.notes.map(n => n.text).join('; ')}].` : '';
+    // 15. DEFAULT ADAPTIVE LLM CHAT
+    const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
+    const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
+    const notesText = userMemory.notes.length > 0 ? `\n[SAVED NOTES]: ${userMemory.notes.map(n => n.text).join(' | ')}.` : '';
 
     const systemMessage = {
       role: 'system',
-      content: `You are Lumina, Flaxy's personal intelligent AI Assistant (Telegram profile avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools (Flashlight Torch, Phone Calling, WhatsApp, YouTube, Spotify, Maps, Free Fire MAX, Termux), real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText} Strict rule: Always speak warmly, confidently, and helpfully strictly in natural Romanized Hinglish (English alphabet, e.g., "Kaise ho Flaxy?"). NEVER write in Devanagari script.`
+      content: `You are Lumina, Flaxy's personal intelligent AI Assistant (Telegram avatar: Lumine from Genshin Impact) with persistent long-term memory, full device automation tools, real-time live web search, weather sensors, and 5TB cloud storage sync.${memoryFactsText}${contactsText}${notesText}
+
+RULES:
+1. Always speak in natural, friendly Romanized Hinglish (English alphabet). Never use Devanagari script.
+2. Adapt response length intelligently:
+   - For simple casual chat, greetings, or basic questions: Keep it crisp, natural, and friendly.
+   - For coding, complex logic, debugging, study concepts, or when asked for detail: Provide comprehensive, in-depth, step-by-step answers and full code.
+3. You have persistent memory. When Flaxy asks about saved facts, notes, contacts, or past info, recall them accurately and instantly.`
     };
 
     chatMemory[0] = systemMessage;
@@ -567,16 +566,16 @@ async function processQuery(payload) {
     return { provider: llmResult.provider, text: llmResult.text, success: true };
 
   } catch (err) {
-    const fallbackRes = await queryLLMWithFallback({ role: 'system', content: 'You are Lumina AI Assistant.' }, prompt);
+    const fallbackRes = await queryLLMWithFallback({ role: 'system', content: 'You are Lumina AI Assistant. Answer helpfully in Hinglish.' }, prompt);
     return { provider: fallbackRes.provider, text: fallbackRes.text, success: true };
   }
 }
 
 // -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT (WITH UNIFIED VISION & MEMORY)
+// 2-WAY TELEGRAM WEBHOOK ENDPOINT (ADAPTIVE VISION & MEMORY)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
-  res.sendStatus(200); // Immediate ACK to Telegram
+  res.sendStatus(200);
 
   const update = req.body;
   if (!update || !update.message) return;
@@ -588,7 +587,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
   const senderName = msg.from?.first_name || msg.from?.username || 'User';
 
-  // Save/Update Telegram User
   userMemory.telegramUsers[chatId] = {
     name: senderName,
     username: msg.from?.username || '',
@@ -596,10 +594,10 @@ app.post('/api/telegram-webhook', async (req, res) => {
   };
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (GEMINI 2.5 FLASH + GROQ VISION WITH UNIFIED MEMORY)
+  // A. HANDLE INCOMING PHOTOS (ADAPTIVE VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
-    const caption = msg.caption || 'Is photo ko scan karke detail mein explain karo aur helpful answer do.';
+    const caption = msg.caption || 'Is photo ko analyze karke helpful answer do.';
 
     try {
       const fileRes = await axios.get(`https://api.telegram.org/bot${token.trim()}/getFile?file_id=${highestPhoto.file_id}`);
@@ -608,26 +606,25 @@ app.post('/api/telegram-webhook', async (req, res) => {
       if (!filePath) {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId,
-          text: `Photo download path nahi mil paya. Kripya dobara bhej kar dekhein.`
+          text: `Photo download path nahi mila. Dobara bhejein.`
         });
         return;
       }
 
-      // Download photo buffer
       const imageRes = await axios.get(`https://api.telegram.org/file/bot${token.trim()}/${filePath}`, {
         responseType: 'arraybuffer'
       });
       const base64Image = Buffer.from(imageRes.data).toString('base64');
       let visionAnswer = '';
 
-      // 1. Primary: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+      // 1. Google Gemini 2.5 Flash
       if (process.env.GEMINI_API_KEY) {
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
           const geminiVisionRes = await axios.post(geminiUrl, {
             contents: [{
               parts: [
-                { text: `You are Lumina AI Assistant for Flaxy (avatar: Lumine from Genshin Impact). Analyze this image thoroughly and answer strictly in natural Romanized Hinglish (English alphabet). Do NOT use Devanagari script.\nUser query: ${caption}` },
+                { text: `You are Lumina AI Assistant for Flaxy (avatar: Lumine from Genshin Impact). Analyze this image intelligently: if it is a simple image or avatar, give a natural and concise reply; if it contains code errors, documents, math or study problems, provide a full step-by-step detailed solution. Always answer in natural Romanized Hinglish (English alphabet). User query: ${caption}` },
                 { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
               ]
             }]
@@ -635,11 +632,11 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
           visionAnswer = geminiVisionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         } catch (geminiErr) {
-          console.warn('[GEMINI 2.5 VISION FAIL] ➔ Trying Groq Vision Fallback:', geminiErr.message);
+          console.warn('[GEMINI 2.5 VISION FAIL] ➔ Groq Vision Fallback:', geminiErr.message);
         }
       }
 
-      // 2. Fallback: Groq Llama 3.2 Vision (`llama-3.2-11b-vision-preview`)
+      // 2. Groq Llama 3.2 Vision Fallback
       if (!visionAnswer && process.env.GROQ_API_KEY) {
         try {
           const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -648,7 +645,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image thoroughly and answer strictly in Romanized Hinglish (English alphabet). Do NOT use Devanagari script.\nUser query: ${caption}` },
+                  { type: 'text', text: `You are Lumina AI Assistant. Analyze this image intelligently in natural Romanized Hinglish. User query: ${caption}` },
                   { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
                 ]
               }
@@ -667,7 +664,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
 
       if (visionAnswer) {
-        // UNIFIED CONTEXT: Save Vision result into chatMemory so Chat API knows about this photo!
         chatMemory.push({ role: 'user', content: `[User sent a photo]: ${caption}` });
         chatMemory.push({ role: 'assistant', content: visionAnswer });
         if (chatMemory.length > 30) chatMemory.splice(1, 2);
@@ -679,7 +675,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       } else {
         await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
           chat_id: chatId,
-          text: `Photo receive ho gayi hai lekin vision models se answer generate nahi ho paya.`
+          text: `Photo receive ho gayi hai lekin answer generate nahi ho paya.`
         });
       }
       return;
@@ -688,7 +684,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       console.error('[TELEGRAM PHOTO ERROR]', e.message);
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
         chat_id: chatId,
-        text: `Photo analysis error: ${e.message}`
+        text: `Photo error: ${e.message}`
       });
       return;
     }
@@ -737,7 +733,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
     try {
       await axios.post(`https://api.telegram.org/bot${token.trim()}/sendMessage`, {
         chat_id: chatId,
-        text: `Lumina: Processing error: ${err.message}`
+        text: `Lumina error: ${err.message}`
       });
     } catch (e) {}
   }
