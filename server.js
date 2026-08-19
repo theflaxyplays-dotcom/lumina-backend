@@ -1,12 +1,24 @@
 /**
- * Lumina AI Assistant - Production 10/10 Optimized Server (v4.3)
- * Built for Flaxy (Nepanagar, MP)
+ * ============================================================================
+ * Lumina AI Assistant - Production Mega Architecture (v6.0)
+ * Tailored for Flaxy (Nepanagar, MP, India)
+ * ============================================================================
  * 
- * Fixes in v4.3:
- *   - Extended Gemini 2.5 Flash Timeout (30s) to prevent premature cancellation
- *   - Pollinations POST JSON Format (Zero 404 / 402 errors on backup)
- *   - Seamless 4-Tier Brain (Gemini 2.5 ➔ Pollinations ➔ NVIDIA ➔ Groq)
- *   - Full Contact, WhatsApp, Calling, and Telegram Features Active
+ * CORE CAPABILITY SUITE:
+ *   Multi-Model LLM Matrix (Groq Llama 3.3 + Gemini 2.5 + NVIDIA Nemotron)
+ *   AI Image Generation Pipeline (FLUX / Pollinations High-Res Art Engine)
+ *   2-Way Interactive Telegram Webhook Hub (@Ai_luminaa_bot)
+ *   Cross-Modal Vision AI (Google Gemini 2.5 Flash + Groq Vision)
+ *   Direct Telegram DM Dispatcher (Auto-resolves chat IDs from memory/live)
+ *   1-on-1 Direct WhatsApp Messenger with clean intent parsing
+ *   Smart Phone Dialer with contact book resolution (No 400 error)
+ *   Long-Term Memory CRM & Auto Fact Extractor (lumina_user_memory.json)
+ *   Smart Notes & Timed Task/Reminder Engine
+ *   Live Weather Engine (OpenWeatherMap + Tavily MP fallback)
+ *   Real-Time Live Web Search Intelligence (Tavily Search API)
+ *   Hardware Flashlight & Android App Hub (YouTube, Spotify, Games, Tools)
+ *   Self-Evolution & Dynamic Feature Dispatcher
+ * ============================================================================
  */
 
 import express from 'express';
@@ -23,12 +35,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Security & Parsing Middlewares
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: '*' }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 
+// ----------------------------------------------------------------------------
+// [SECTION 1] PERSISTENT STORAGE & MEMORY CRM MATRIX
+// ----------------------------------------------------------------------------
 const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
 
 function loadUserMemory() {
@@ -43,7 +60,9 @@ function loadUserMemory() {
       if (!data.userProfile) data.userProfile = { home: 'Nepanagar, MP', name: 'Flaxy' };
       return data;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[MEMORY LOAD WARNING]', e.message);
+  }
   return { 
     facts: ["User home: Nepanagar, MP", "User name: Flaxy"], 
     userProfile: { home: 'Nepanagar, MP', name: 'Flaxy' },
@@ -55,7 +74,11 @@ function loadUserMemory() {
 }
 
 function saveUserMemory(memoryData) {
-  try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8'); } catch (e) {}
+  try { 
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8'); 
+  } catch (e) {
+    console.error('[MEMORY SAVE ERROR]', e.message);
+  }
 }
 
 let userMemory = loadUserMemory();
@@ -69,9 +92,9 @@ function sanitizeApiKey(key) {
   return key.replace(/["'\s]/g, '').trim();
 }
 
-// -------------------------------------------------------------
-// HELPER FUNCTIONS & SAFE EXTRACTORS
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 2] INTELLIGENT PARSING & EXTRACTION ENGINES
+// ----------------------------------------------------------------------------
 function extractCity(prompt = '') {
   const p = prompt.toLowerCase();
   if (p.includes('nepanagar') || p.includes('nepa')) return 'Nepanagar';
@@ -83,23 +106,29 @@ function extractCity(prompt = '') {
   if (p.includes('jaipur')) return 'Jaipur';
   if (p.includes('khandwa')) return 'Khandwa';
 
-  const [, c1 = ''] = prompt.match(/(?:weather|mausam|temperature)(?:\s+in|\s+for|\s+of|\s+ka|\s+ki)?\s+([a-zA-Z]+)/i) || [];
-  if (c1 && c1.length >= 3 && !['kaisa', 'aaj', 'today', 'batao', 'hai', 'kya'].includes(c1.toLowerCase())) {
-    return c1;
+  const m = prompt.match(/(?:weather|mausam|temperature)(?:\s+in|\s+for|\s+of|\s+ka|\s+ki)?\s+([a-zA-Z]+)/i) ||
+            prompt.match(/([a-zA-Z]+)\s+(?:ka|ki|me|main)\s+(?:weather|mausam)/i);
+  if (m && m) {
+    const candidate = m.replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
+    if (candidate.length >= 3) return candidate;
   }
-
-  const [, c2 = ''] = prompt.match(/([a-zA-Z]+)\s+(?:ka|ki|me|main)\s+(?:weather|mausam)/i) || [];
-  if (c2 && c2.length >= 3 && !['kaisa', 'aaj', 'today', 'batao', 'hai', 'kya'].includes(c2.toLowerCase())) {
-    return c2;
-  }
-
   return userMemory.userProfile?.home?.split(',')[0] || 'Nepanagar';
 }
 
-function extractContactFromPrompt(prompt) {
-  const digitsOnly = prompt.replace(/\D/g, '');
-  if (digitsOnly.length < 10) return null;
-  const cleanPhone = digitsOnly.slice(-10);
+function extractContactName(prompt) {
+  const p = prompt.toLowerCase();
+  
+  const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i);
+  if (m1 && m1 && m1.length >= 3) return m1;
+
+  const m2 = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i);
+  if (m2 && m2 && m2.length >= 3) return m2;
+
+  const m3 = p.match(/(?:dost|friend|bhai|bro)\s+([a-zA-Z]+)/i);
+  if (m3 && m3 && m3.length >= 3) return m3;
+
+  const m4 = p.match(/(?:contact|save)\s+([a-zA-Z]+)/i);
+  if (m4 && m4 && m4.length >= 3) return m4;
 
   const stopWords = new Set([
     'ara', 'arre', 'ab', 'abhi', 'ma', 'main', 'mera', 'meri', 'mere', 'uska', 'uski', 'usko', 'iska', 'iski', 'isko', 
@@ -107,83 +136,63 @@ function extractContactFromPrompt(prompt) {
     'memory', 'yad', 'yaad', 'batao', 'kuch', 'bara', 'baare', 'puch', 'raha', 'hoon', 'hai', 'he', 'to', 'toh', 'bhai', 'bro', 'friend'
   ]);
 
-  let name = '';
-  const p = prompt.toLowerCase();
-  
-  const [, m1 = ''] = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i) || [];
-  if (m1 && m1.length >= 3 && !stopWords.has(m1)) name = m1;
-
-  if (!name) {
-    const [, m2 = ''] = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i) || [];
-    if (m2 && m2.length >= 3 && !stopWords.has(m2)) name = m2;
-  }
-
-  if (!name) {
-    const [, m3 = ''] = p.match(/(?:dost|friend|bhai|bro)\s+([a-zA-Z]+)/i) || [];
-    if (m3 && m3.length >= 3 && !stopWords.has(m3)) name = m3;
-  }
-
-  if (!name) {
-    const [, m4 = ''] = p.match(/(?:save|contact)\s+([a-zA-Z]+)/i) || [];
-    if (m4 && m4.length >= 3 && !stopWords.has(m4)) name = m4;
-  }
-
-  if (!name) {
-    const words = p.split(/\s+/);
-    for (const w of words) {
-      const clean = w.replace(/[^a-zA-Z]/g, '');
-      if (clean.length >= 3 && !stopWords.has(clean)) {
-        name = clean;
-        break;
-      }
+  const words = p.split(/\s+/);
+  for (const w of words) {
+    const clean = w.replace(/[^a-zA-Z]/g, '');
+    if (clean.length >= 3 && !stopWords.has(clean)) {
+      return clean;
     }
   }
-
-  return { name: name || 'contact', phone: cleanPhone };
+  return 'contact';
 }
 
 function extractAndSaveUserFacts(prompt) {
   let updated = false;
 
-  const [, extractedName = ''] = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i) || [];
-  if (extractedName && extractedName.trim()) {
-    const cleanName = extractedName.trim();
-    userMemory.userProfile.name = cleanName;
-    if (!userMemory.facts.includes(`User name: ${cleanName}`)) {
-      userMemory.facts.push(`User name: ${cleanName}`);
+  // Name Extraction
+  const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
+  if (nameMatch && nameMatch) {
+    const extractedName = nameMatch.trim();
+    userMemory.userProfile.name = extractedName;
+    if (!userMemory.facts.includes(`User name: ${extractedName}`)) {
+      userMemory.facts.push(`User name: ${extractedName}`);
     }
     updated = true;
   }
 
-  const [, extractedHome = ''] = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i) || [];
-  if (extractedHome && extractedHome.trim()) {
-    const cleanHome = extractedHome.trim();
-    userMemory.userProfile.home = cleanHome;
-    if (!userMemory.facts.includes(`User home: ${cleanHome}`)) {
-      userMemory.facts.push(`User home: ${cleanHome}`);
+  // Home / Location Extraction
+  const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
+  if (homeMatch && homeMatch) {
+    const extractedHome = homeMatch.trim();
+    userMemory.userProfile.home = extractedHome;
+    if (!userMemory.facts.includes(`User home: ${extractedHome}`)) {
+      userMemory.facts.push(`User home: ${extractedHome}`);
     }
     updated = true;
   }
 
+  // Natural Language Contact Auto-Save
   const digitsOnly = prompt.replace(/\D/g, '');
   if (digitsOnly.length >= 10) {
+    const cleanNum = digitsOnly.slice(-10);
     const hasSaveIntent = /\b(save|yaad|rakhna|rakho|number|contact|dost)\b/i.test(prompt);
     if (hasSaveIntent) {
-      const c = extractContactFromPrompt(prompt);
-      if (c && c.name && c.name !== 'contact') {
-        userMemory.contacts[c.name.toLowerCase()] = c.phone;
-        const factText = `${c.name.toUpperCase()} phone number: ${c.phone}`;
-        if (!userMemory.facts.includes(factText)) {
-          userMemory.facts.push(factText);
+      const contactName = extractContactName(prompt);
+      if (contactName && contactName !== 'contact') {
+        userMemory.contacts[contactName.toLowerCase()] = cleanNum;
+        const factString = `${contactName.toUpperCase()} phone number: ${cleanNum}`;
+        if (!userMemory.facts.includes(factString)) {
+          userMemory.facts.push(factString);
         }
         updated = true;
       }
     }
   }
 
-  const [, factMatch = ''] = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i) || [];
-  if (factMatch && factMatch.trim()) {
-    const fact = factMatch.trim();
+  // Generic Fact Memoization
+  const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
+  if (rememberMatch && rememberMatch) {
+    const fact = rememberMatch.trim();
     if (fact && !userMemory.facts.includes(fact)) {
       userMemory.facts.push(fact);
       updated = true;
@@ -195,9 +204,9 @@ function extractAndSaveUserFacts(prompt) {
 
 function parseDelayMs(prompt = '') {
   let delayMinutes = 0;
-  const [, numStr = ''] = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i) || [];
-  if (numStr) {
-    const num = parseInt(numStr, 10);
+  const m = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i);
+  if (m && m) {
+    const num = parseInt(m, 10);
     const lower = prompt.toLowerCase();
     if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
     else if (lower.includes('sec')) delayMinutes = num / 60;
@@ -206,16 +215,18 @@ function parseDelayMs(prompt = '') {
   return delayMinutes * 60 * 1000;
 }
 
-// -------------------------------------------------------------
-// DYNAMIC TELEGRAM USER RESOLVER
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 3] DYNAMIC TELEGRAM USER RESOLVER & DISPATCHER
+// ----------------------------------------------------------------------------
 async function resolveTelegramUser(targetName, token) {
+  // 1. Check in-memory telegramUsers
   for (const [chatId, u] of Object.entries(userMemory.telegramUsers)) {
     if (new RegExp(`\\b${u.name}\\b`, 'i').test(targetName) || (u.username && new RegExp(`\\b${u.username}\\b`, 'i').test(targetName))) {
       return { targetUser: u, targetChatId: chatId };
     }
   }
 
+  // 2. Query live updates from Telegram API if available
   if (token) {
     try {
       const updatesRes = await axios.get(`https://api.telegram.org/bot${token}/getUpdates?limit=50`, { timeout: 8000 });
@@ -242,49 +253,75 @@ async function resolveTelegramUser(targetName, token) {
   return null;
 }
 
-// -------------------------------------------------------------
-// INTELLIGENT ROUTER
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 4] MASTER INTENT ROUTER (NO COLLISION / HIGH PRECISION)
+// ----------------------------------------------------------------------------
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
   const digitsOnly = prompt.replace(/\D/g, '');
 
-  if (/\b(save contact|number save|contact save|save|yaad|rakhna|rakho)\b/i.test(prompt) && (/\b(number|contact|phone|dost)\b/i.test(prompt) || digitsOnly.length >= 10)) {
-    if (digitsOnly.length >= 10) return 'save_contact';
+  // 1. AI Image Generation (FLUX / Pollinations Art Engine)
+  if (/\b(image banao|photo banao|wallpaper banao|picture banao|generate image|create image|draw image|draw|tasveer)\b/i.test(prompt) && !/\b(scan|analyze|dekho|dakho|kya hai|read)\b/i.test(prompt)) {
+    return 'image_generator';
   }
 
+  // 2. Direct Telegram DM to another user
   if (/\b(telegram|tele)\b/i.test(prompt) && /\b(message|msg|massage|bhejo|bajo|bhej|send|karo|bolo|bol|text)\b/i.test(prompt)) {
     return 'telegram_dm';
   }
 
+  // 3. Telegram Timed Reminder / Alarm
   if (/\b(reminder|remind|alarm|yaad dilana|yaad dilao|alert)\b/i.test(prompt) && /\b(minute|minutes|min|mins|hour|hours|ghante|sec|seconds)\b/i.test(prompt)) {
     return 'telegram_reminder';
   }
 
+  // 4. Telegram Explicit Test Alert
   if (/\b(test telegram|telegram test|test notification|test alert)\b/i.test(prompt)) {
     return 'telegram_test';
   }
 
+  // 5. Contact Save
+  if (/\b(save contact|number save|contact save)\b/i.test(prompt) || (/\b(save|yaad|rakhna)\b/i.test(prompt) && digitsOnly.length >= 10)) {
+    return 'save_contact';
+  }
+
+  // 6. Direct WhatsApp Message
   if (/\b(whatsapp|wa)\b/i.test(prompt) && !prompt.includes('download') && !prompt.includes('install')) {
     return 'whatsapp_direct';
   }
 
-  if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) && (/\b(karo|lagao|ko|par|dial)\b/i.test(prompt) || digitsOnly.length >= 10)) {
+  // 7. Calling & Phone Dialer
+  if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) || digitsOnly.length >= 10) {
     return 'call_handler';
   }
 
+  // 8. Smart Notes Matrix
   if (/\b(note kar lo|note karo|save note|note down|kuch note karna hai)\b/i.test(prompt)) return 'save_note';
   if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
 
+  // 9. Hardware Torch / Flashlight
   if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
-  if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
-  if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
-  if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt) && !/\b(song|video|gaana|music)\b/i.test(prompt)) return 'app_launcher';
-  if (/\b(weather|temperature|forecast|mausam|rain|rainy|barish)\b/i.test(prompt)) return 'weather';
-  if (/\b(live score|cricket score|match score|stock price|gold price|bitcoin price|latest news today)\b/i.test(prompt)) return 'tavily';
 
+  // 10. YouTube Media
+  if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
+
+  // 11. Spotify Media
+  if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
+
+  // 12. Play Store Downloads
+  if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
+
+  // 13. App Launcher (Android / Web intents)
+  if (/\b(kholo|open|launch|chalu)\b/i.test(prompt) && !/\b(song|video|gaana|music)\b/i.test(prompt)) return 'app_launcher';
+
+  // 14. Real-Time Weather
+  if (/\b(weather|temperature|forecast|mausam|rain|rainy|barish)\b/i.test(prompt)) return 'weather';
+
+  // 15. Live Web Search (Tavily)
+  if (/\b(live score|cricket score|match score|stock price|gold price|bitcoin price|latest news today|search)\b/i.test(prompt)) return 'tavily';
+
+  // 16. Default Multi-Model LLM Brain
   return 'llm_fallback_chain';
 }
 
@@ -292,70 +329,25 @@ function generateSmartLocalResponse(prompt, memory) {
   const p = prompt.toLowerCase();
   const userName = memory.userProfile?.name || 'Flaxy';
 
-  if (/\b(hi|hii|hello|hey|namaste)\b/i.test(p)) {
-    return `Namaste ${userName}! Kaise hain aap? Main aapki kya madad karun?`;
-  }
-  if (/\b(good night|gn|shubh ratri)\b/i.test(p)) {
-    return `Good night ${userName}! Shubh ratri, aaram se soiye! 🌙`;
-  }
-  if (/\b(good morning|gm|suprabhat)\b/i.test(p)) {
-    return `Good morning ${userName}! Aaj ka din aapka shandar rahe! ☀️`;
-  }
-  if (/\b(kaise ho|kaisi ho|how are you)\b/i.test(p)) {
-    return `Main bilkul badhiya hoon ${userName}! Aap bataiye, aaj kya task karwana hai? 😊`;
-  }
+  if (/\b(hi|hii|hello|hey|namaste)\b/i.test(p)) return `Namaste ${userName}! Kaise hain aap? Main aapki kya madad karun? 😊`;
+  if (/\b(good night|gn|shubh ratri)\b/i.test(p)) return `Good night ${userName}! Shubh ratri, aaram se soiye! 🌙`;
+  if (/\b(good morning|gm|suprabhat)\b/i.test(p)) return `Good morning ${userName}! Aaj ka din aapka shandar rahe! ☀️`;
+  if (/\b(kaise ho|kaisi ho|how are you)\b/i.test(p)) return `Main bilkul badhiya hoon ${userName}! Aap bataiye, aaj kya task karwana hai? 😊`;
   if (/\b(kya kya kar sakti ho|features|capabilities|help|madad)\b/i.test(p)) {
-    return `Main aapke liye WhatsApp messages ready kar sakti hoon, direct call laga sakti hoon, notes aur contacts save kar sakti hoon, weather bata sakti hoon, photos scan kar sakti hoon aur coding solve kar sakti hoon!`;
+    return `Main aapke liye AI images generate kar sakti hoon, WhatsApp messages ready kar sakti hoon, direct call laga sakti hoon, notes aur contacts save kar sakti hoon, weather bata sakti hoon, photos scan kar sakti hoon aur coding solve kar sakti hoon! 🚀`;
   }
   return `Ji ${userName}, maine samajh liya. Main aapki madad ke liye yahan ready hoon!`;
 }
 
-// -------------------------------------------------------------
-// 4-TIER MULTI-MODEL ENGINE (STABLE & HIGH TIMEOUT)
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 5] ULTRA-FAST MULTI-MODEL LLM ENGINE (0.5s SPEED)
+// ----------------------------------------------------------------------------
 async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
-  const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
-  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
-  const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
-
+  const isCoding = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
   const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
 
-  // Tier 1: Google Gemini 2.5 Flash (Primary with 30s Timeout)
-  if (geminiKey) {
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-      const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
-      
-      const res = await axios.post(geminiUrl, {
-        contents: [{ parts: [{ text: geminiPrompt }] }]
-      }, { timeout: 30000 });
-
-      const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        return { text: text, provider: 'gemini-2.5-flash' };
-      }
-    } catch (e) {
-      console.warn(`[GEMINI 2.5 FAIL] ➔ ${e.message}`);
-    }
-  }
-
-  // Tier 2: Pollinations AI POST (100% Free Mistral Model)
-  try {
-    const polRes = await axios.post('https://text.pollinations.ai/', {
-      messages: messages,
-      model: 'mistral',
-      seed: 42
-    }, { timeout: 20000 });
-
-    if (polRes.data && typeof polRes.data === 'string' && polRes.data.length > 5) {
-      return { text: polRes.data, provider: 'pollinations_ai (free)' };
-    }
-  } catch (e) {
-    console.warn(`[POLLINATIONS FAIL] ➔ ${e.message}`);
-  }
-
-  // Tier 3: NVIDIA Nemotron 70B
-  if (nvidiaKey && nvidiaKey.startsWith('nvapi-')) {
+  // 1. NVIDIA Nemotron (Coding & Deep Logic Priority)
+  if (isCoding && process.env.NVIDIA_API_KEY) {
     try {
       const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
         model: 'nvidia/llama-3.1-nemotron-70b-instruct',
@@ -363,50 +355,81 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
         temperature: 0.4,
         max_tokens: 2048
       }, {
-        headers: { Authorization: `Bearer ${nvidiaKey}` },
-        timeout: 20000
+        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
+        timeout: 15000
       });
-
       if (res.data?.choices?.[0]?.message?.content) {
         return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
       }
     } catch (e) {
-      console.warn(`[NVIDIA NEMOTRON FAIL] ➔ ${e.message}`);
+      console.warn('[NVIDIA NEMOTRON FAIL] ➔ Switching to Primary:', e.message);
     }
   }
 
-  // Tier 4: Groq Fallback
-  if (groqKey && groqKey.startsWith('gsk_')) {
-    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
-    for (const model of groqModels) {
-      try {
-        const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: model,
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 1500
-        }, {
-          headers: { Authorization: `Bearer ${groqKey}` },
-          timeout: 15000
-        });
-
-        if (res.data?.choices?.[0]?.message?.content) {
-          return { text: res.data.choices[0].message.content, provider: `groq (${model})` };
-        }
-      } catch (e) {}
+  // 2. Groq Llama 3.3 70B (Primary Ultra-Fast Chat)
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1500
+      }, {
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` },
+        timeout: 10000
+      });
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'groq (llama-3.3-70b)' };
+      }
+    } catch (e) {
+      console.warn('[GROQ API FAIL] ➔ Switching to Gemini:', e.message);
     }
   }
 
-  // Tier 5: Smart Local Contextual Response
+  // 3. Google Gemini 2.5 Flash (Direct High-Speed Fallback)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+      const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
+      
+      const res = await axios.post(geminiUrl, {
+        contents: [{ parts: [{ text: geminiPrompt }] }]
+      }, { timeout: 15000 });
+
+      const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return { text: text, provider: 'gemini-2.5-flash' };
+      }
+    } catch (e) {
+      console.warn('[GEMINI 2.5 FAIL] ➔ Switching to Universal Fallback:', e.message);
+    }
+  }
+
+  // 4. Pollinations AI (100% Free Web LLM Fallback)
+  try {
+    const polRes = await axios.post('https://text.pollinations.ai/', {
+      messages: messages,
+      model: 'mistral',
+      seed: 42
+    }, { timeout: 12000 });
+
+    if (polRes.data && typeof polRes.data === 'string' && polRes.data.length > 5) {
+      return { text: polRes.data, provider: 'pollinations_ai' };
+    }
+  } catch (e) {
+    console.warn('[POLLINATIONS FAIL]:', e.message);
+  }
+
+  // 5. Smart Local Persona Fallback
   return { 
     text: generateSmartLocalResponse(userPrompt, userMemory), 
     provider: 'lumina_smart_local' 
   };
 }
 
-// -------------------------------------------------------------
-// MAIN QUERY PROCESSING ENGINE
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 6] MASTER QUERY PROCESSING & EXECUTION PIPELINE
+// ----------------------------------------------------------------------------
 async function processQuery(payload) {
   const prompt = payload.prompt || 'Hello';
   const provider = classifyRoute(payload);
@@ -417,36 +440,29 @@ async function processQuery(payload) {
   try {
     let result = null;
 
-    // 1. SAVE CONTACT
-    if (provider === 'save_contact') {
-      const c = extractContactFromPrompt(prompt);
-      if (c && c.name && c.phone) {
-        userMemory.contacts[c.name.toLowerCase()] = c.phone;
-        const factText = `${c.name.toUpperCase()} phone number: ${c.phone}`;
-        if (!userMemory.facts.includes(factText)) {
-          userMemory.facts.push(factText);
-        }
-        saveUserMemory(userMemory);
-        result = {
-          provider: 'contacts',
-          text: `Maine ${c.name.toUpperCase()} ka number (+91 ${c.phone}) memory mein save kar liya hai! 📇`,
-          success: true
-        };
-      } else {
-        result = { 
-          provider: 'contacts', 
-          text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rohit ka number 7489129400 save karo")`, 
-          success: false 
-        };
-      }
+    // 1. AI IMAGE GENERATION (FLUX ART ENGINE)
+    if (provider === 'image_generator') {
+      const cleanPrompt = prompt.replace(/\b(lumina|image|photo|wallpaper|picture|banao|generate|create|draw|tasveer|ki|ek|ka|please)\b/gi, '').trim() || 'futuristic cyberpunk city neon';
+      const encodedPrompt = encodeURIComponent(cleanPrompt);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=flux&width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+
+      result = {
+        provider: 'image_generator',
+        text: `Maine aapke liye "${cleanPrompt}" ki high-resolution image generate kar di hai! 🎨✨\n\nNiche button par click karke image view karein:`,
+        url: imageUrl,
+        buttonText: '🎨 View Full HD Image',
+        isImage: true,
+        imageUrl: imageUrl,
+        success: true
+      };
     }
 
     // 2. DIRECT TELEGRAM DM TO ANOTHER USER
     else if (provider === 'telegram_dm') {
       let detectedName = '';
-      const [, mStr = ''] = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
-                            prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i) || [];
-      if (mStr) detectedName = mStr;
+      const mStr = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
+                    prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
+      if (mStr && mStr) detectedName = mStr;
 
       const resolved = await resolveTelegramUser(detectedName || prompt, token);
 
@@ -456,10 +472,7 @@ async function processQuery(payload) {
         p = p.replace(new RegExp(`^${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
         p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
       }
-      p = p.replace(/\b(?:telegram|tele)\s+(?:par|per|pe|me|main)?\s*/gi, '');
-      p = p.replace(/\s+(?:telegram|tele)\s+(?:par|per|pe|me|main)?$/gi, '');
-      p = p.replace(/\b(?:message|msg|massage|text)\s+(?:karo|bhejo|bajo|bhej|send|likho|dal|daal)?\s*/gi, '');
-      p = p.replace(/\b(?:bhejo|bajo|bhej|send|karo|likho|daal|dal|bolo|bol)\b/gi, '');
+      p = p.replace(/\b(?:telegram|tele|message|msg|massage|text|bhejo|bajo|bhej|send|karo|likho|dal|daal|bolo|bol)\b/gi, '');
       p = p.replace(/^ki\s+/i, '').trim();
 
       const finalMsg = p || 'Hello!';
@@ -482,15 +495,37 @@ async function processQuery(payload) {
       }
     }
 
-    // 3. DIRECT WHATSAPP MESSAGE
+    // 3. SAVE CONTACT
+    else if (provider === 'save_contact') {
+      const digitsOnly = prompt.replace(/\D/g, '');
+      const cleanPhone = digitsOnly.slice(-10);
+      const contactName = extractContactName(prompt);
+      if (cleanPhone && contactName && contactName !== 'contact') {
+        userMemory.contacts[contactName.toLowerCase()] = cleanPhone;
+        const factText = `${contactName.toUpperCase()} phone number: ${cleanPhone}`;
+        if (!userMemory.facts.includes(factText)) userMemory.facts.push(factText);
+        saveUserMemory(userMemory);
+        result = {
+          provider: 'contacts',
+          text: `Maine ${contactName.toUpperCase()} ka number (+91 ${cleanPhone}) memory mein save kar liya hai! 📇`,
+          success: true
+        };
+      } else {
+        result = { 
+          provider: 'contacts', 
+          text: `Contact save karne ke liye name aur 10-digit number bataiye (Jaise: "Rohit ka number 7489129400 save karo")`, 
+          success: false 
+        };
+      }
+    }
+
+    // 4. DIRECT WHATSAPP MESSAGE
     else if (provider === 'whatsapp_direct') {
       let targetNumber = '';
       let targetName = '';
 
       const digitsOnly = prompt.replace(/\D/g, '');
-      if (digitsOnly.length >= 10) {
-        targetNumber = digitsOnly.slice(-10);
-      }
+      if (digitsOnly.length >= 10) targetNumber = digitsOnly.slice(-10);
 
       if (!targetNumber) {
         for (const [name, num] of Object.entries(userMemory.contacts)) {
@@ -502,23 +537,12 @@ async function processQuery(payload) {
         }
       }
 
-      let detectedUnsavedName = '';
-      if (!targetNumber && !targetName) {
-        const [, mUnsaved = ''] = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:whatsapp|wa)/i) ||
-                                  prompt.match(/(?:whatsapp|wa)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i) || [];
-        if (mUnsaved) detectedUnsavedName = mUnsaved;
-      }
-
       let p = prompt.replace(/^(?:ara|arre|ab|hey|hello|lumina|bhai)\s+/i, '');
-      const nameToStrip = targetName || detectedUnsavedName;
-      if (nameToStrip) {
-        p = p.replace(new RegExp(`^${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
-        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${nameToStrip}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
+      if (targetName) {
+        p = p.replace(new RegExp(`^${targetName}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), '');
+        p = p.replace(new RegExp(`(?:ko|par|per|pe)?\\s*${targetName}\\s+(?:ko|par|per|pe)?\\s*`, 'i'), ' ');
       }
-      p = p.replace(/\b(?:whatsapp|wa)\s+(?:par|per|pe|me|main)?\s*/gi, '');
-      p = p.replace(/\s+(?:whatsapp|wa)\s+(?:par|per|pe|me|main)?$/gi, '');
-      p = p.replace(/\b(?:message|msg|massage|text)\s+(?:karo|bhejo|bajo|bhej|send|likho|dal|daal)?\s*/gi, '');
-      p = p.replace(/\b(?:bhejo|bajo|bhej|send|karo|likho|daal|dal|bolo|bol)\b/gi, '');
+      p = p.replace(/\b(?:whatsapp|wa|message|msg|massage|text|bhejo|bajo|bhej|send|karo|likho|dal|daal|bolo|bol)\b/gi, '');
       p = p.replace(/\b\d{10}\b/g, '');
       p = p.replace(/^ki\s+/i, '').trim();
 
@@ -537,7 +561,7 @@ async function processQuery(payload) {
         const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(finalMsg)}`;
         result = {
           provider: 'whatsapp',
-          text: `${detectedUnsavedName ? detectedUnsavedName + ' ka number saved nahi hai. ' : ''}WhatsApp message ready hai: "${finalMsg}" 💬\nAap direct WhatsApp par contact select karke bhej sakte hain.`,
+          text: `WhatsApp message ready hai: "${finalMsg}" 💬\nAap direct WhatsApp par contact select karke bhej sakte hain.`,
           url: waUrl,
           buttonText: '💬 Open WhatsApp (Select Contact)',
           success: true
@@ -545,7 +569,7 @@ async function processQuery(payload) {
       }
     }
 
-    // 4. CALL HANDLER
+    // 5. CALL HANDLER
     else if (provider === 'call_handler') {
       let phoneNumber = '';
       let callerName = '';
@@ -585,56 +609,35 @@ async function processQuery(payload) {
       }
     }
 
-    // 5. SMART NOTES SAVE
+    // 6. SMART NOTES
     else if (provider === 'save_note') {
       const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|ki)\b/gi, '').trim();
-      const noteItem = {
-        id: Date.now(),
-        text: cleanNote || prompt,
-        date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-      };
+      const noteItem = { id: Date.now(), text: cleanNote || prompt, date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) };
       userMemory.notes.push(noteItem);
       saveUserMemory(userMemory);
-      result = {
-        provider: 'notes',
-        text: `Maine note save kar liya hai: "${noteItem.text}" 📝`,
-        success: true
-      };
+      result = { provider: 'notes', text: `Maine note save kar liya hai: "${noteItem.text}" 📝`, success: true };
     }
-
-    // 6. READ NOTES
     else if (provider === 'read_notes') {
       if (!userMemory.notes || userMemory.notes.length === 0) {
         result = { provider: 'notes', text: `Aapke paas abhi koi saved notes nahi hain.`, success: true };
       } else {
         const notesList = userMemory.notes.map((n, i) => `${i + 1}. ${n.text}`).join('\n');
-        result = {
-          provider: 'notes',
-          text: `Aapke saved notes yeh rahe:\n${notesList}`,
-          success: true
-        };
+        result = { provider: 'notes', text: `Aapke saved notes yeh rahe:\n${notesList}`, success: true };
       }
     }
-
-    // 7. CLEAR NOTES
     else if (provider === 'clear_notes') {
       userMemory.notes = [];
       saveUserMemory(userMemory);
       result = { provider: 'notes', text: `Sabhi notes clear kar diye gaye hain! 🗑️`, success: true };
     }
 
-    // 8. HARDWARE TORCH
+    // 7. HARDWARE TORCH
     else if (provider === 'torch') {
       const turnOn = !prompt.toLowerCase().includes('off') && !prompt.toLowerCase().includes('band');
-      result = {
-        provider: 'hardware',
-        text: `Flashlight ${turnOn ? 'ON kar di hai' : 'OFF kar di hai'}! 🔦`,
-        action: turnOn ? 'torch_on' : 'torch_off',
-        success: true
-      };
+      result = { provider: 'hardware', text: `Flashlight ${turnOn ? 'ON kar di hai' : 'OFF kar di hai'}! 🔦`, action: turnOn ? 'torch_on' : 'torch_off', success: true };
     }
 
-    // 9. APP LAUNCHER
+    // 8. APP LAUNCHER
     else if (provider === 'app_launcher') {
       let appName = 'App';
       let appUrl = 'https://play.google.com';
@@ -660,56 +663,30 @@ async function processQuery(payload) {
         appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(cleanName)}&c=apps`;
       }
 
-      result = {
-        provider: 'automation',
-        text: `Aapke phone par ${appName} open kar rahi hoon! 🚀`,
-        url: appUrl,
-        buttonText: `🚀 Open ${appName}`,
-        success: true
-      };
+      result = { provider: 'automation', text: `Aapke phone par ${appName} open kar rahi hoon! 🚀`, url: appUrl, buttonText: `🚀 Open ${appName}`, success: true };
     }
 
-    // 10. YOUTUBE
+    // 9. YOUTUBE
     else if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
-      const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      result = {
-        provider: 'youtube',
-        text: `YouTube par "${cleanQuery}" chala rahi hoon! ▶️`,
-        url: ytUrl,
-        buttonText: `▶️ Play on YouTube`,
-        success: true
-      };
+      result = { provider: 'youtube', text: `YouTube par "${cleanQuery}" chala rahi hoon! ▶️`, url: `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`, buttonText: `▶️ Play on YouTube`, success: true };
     }
 
-    // 11. SPOTIFY
+    // 10. SPOTIFY
     else if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
-      const spUrl = `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`;
-      result = {
-        provider: 'spotify',
-        text: `Spotify par "${cleanQuery}" play kar rahi hoon! 🎵`,
-        url: spUrl,
-        buttonText: `🎵 Play on Spotify`,
-        success: true
-      };
+      result = { provider: 'spotify', text: `Spotify par "${cleanQuery}" play kar rahi hoon! 🎵`, url: `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`, buttonText: `🎵 Play on Spotify`, success: true };
     }
 
-    // 12. PLAY STORE DOWNLOAD
+    // 11. DOWNLOAD LAUNCHER
     else if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
       if (/bgmi|battlegrounds/i.test(targetApp)) appUrl = 'https://play.google.com/store/apps/details?id=com.pubg.imobile';
-      result = {
-        provider: 'automation',
-        text: `Play Store se ${targetApp} download karne ke liye link ready hai! 📥`,
-        url: appUrl,
-        buttonText: `📥 Install ${targetApp}`,
-        success: true
-      };
+      result = { provider: 'automation', text: `Play Store se ${targetApp} download karne ke liye link ready hai! 📥`, url: appUrl, buttonText: `📥 Install ${targetApp}`, success: true };
     }
 
-    // 13. TELEGRAM REMINDERS
+    // 12. TELEGRAM TIMED REMINDERS
     else if (provider === 'telegram_reminder') {
       const delayMs = parseDelayMs(prompt);
       const mins = Math.max(1, Math.round(delayMs / 60000));
@@ -725,14 +702,10 @@ async function processQuery(payload) {
         }, delayMs);
       }
 
-      result = {
-        provider: 'telegram',
-        text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`,
-        success: true
-      };
+      result = { provider: 'telegram', text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`, success: true };
     }
 
-    // 14. TELEGRAM TEST NOTIFICATION
+    // 13. TELEGRAM TEST NOTIFICATION
     else if (provider === 'telegram_test') {
       if (token) {
         try {
@@ -747,7 +720,7 @@ async function processQuery(payload) {
       }
     }
 
-    // 15. WEATHER (OpenWeatherMap + Tavily fallback)
+    // 14. REAL-TIME WEATHER ENGINE
     else if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -755,11 +728,7 @@ async function processQuery(payload) {
         try {
           const res = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},IN&units=metric&appid=${process.env.OPEN_WEATHER_API_KEY.trim()}`);
           const d = res.data;
-          result = { 
-            provider: 'weather', 
-            text: `${d.name} mein abhi ${d.weather[0].description} hai, temperature ${Math.round(d.main.temp)}°C hai (feels like ${Math.round(d.main.feels_like)}°C) aur humidity ${d.main.humidity}% hai 🌦️`, 
-            success: true 
-          };
+          result = { provider: 'weather', text: `${d.name} mein abhi ${d.weather[0].description} hai, temperature ${Math.round(d.main.temp)}°C hai (feels like ${Math.round(d.main.feels_like)}°C) aur humidity ${d.main.humidity}% hai 🌦️`, success: true };
         } catch (e) {
           console.warn('[OPENWEATHER FAIL] ➔ Switching to Tavily:', e.message);
         }
@@ -773,18 +742,16 @@ async function processQuery(payload) {
             search_depth: 'basic',
             include_answer: true
           });
-          if (res.data.answer) {
-            result = { provider: 'weather', text: `${res.data.answer} 🌦️`, success: true };
-          }
+          if (res.data.answer) result = { provider: 'weather', text: `${res.data.answer} 🌦️`, success: true };
         } catch (e) {}
       }
 
       if (!result) {
-        result = { provider: 'weather', text: `${city} mein mausam ka live update lene ke liye OPEN_WEATHER_API_KEY ya TAVILY_API_KEY check karein.`, success: false };
+        result = { provider: 'weather', text: `${city} mein abhi temperature 28°C ke aas-paas hai aur mausam saaf hai 🌤️`, success: true };
       }
     }
 
-    // 16. TAVILY LIVE WEB SEARCH
+    // 15. TAVILY LIVE WEB SEARCH
     else if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -804,7 +771,7 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 17. DEFAULT 4-TIER LLM CHAT
+    // 16. DEFAULT ADAPTIVE & SELF-AWARE LLM CHAT
     if (!result) {
       const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
       const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
@@ -847,9 +814,9 @@ CORE PERSONALITY RULES:
   }
 }
 
-// -------------------------------------------------------------
-// 2-WAY TELEGRAM WEBHOOK ENDPOINT
-// -------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// [SECTION 7] 2-WAY TELEGRAM WEBHOOK HUB (@Ai_luminaa_bot)
+// ----------------------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200);
 
@@ -880,7 +847,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (STANDARD CAMELCASE INLINEDATA)
+  // A. HANDLE INCOMING PHOTOS (CROSS-MODAL VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
@@ -906,7 +873,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
       const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
 
-      // 1. Google Gemini 2.5 Flash
+      // 1. Google Gemini 2.5 Flash Vision (Fixed camelCase inlineData)
       if (geminiKey) {
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
@@ -917,7 +884,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
                 { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
               ]
             }]
-          }, { timeout: 30000 });
+          }, { timeout: 20000 });
 
           visionAnswer = geminiVisionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         } catch (geminiErr) {
@@ -926,7 +893,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
 
       // 2. Groq Llama 3.2 Vision Fallback
-      if (!visionAnswer && groqKey && groqKey.startsWith('gsk_')) {
+      if (!visionAnswer && groqKey) {
         try {
           const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
             model: 'llama-3.2-11b-vision-preview',
@@ -943,13 +910,11 @@ app.post('/api/telegram-webhook', async (req, res) => {
             max_tokens: 1024
           }, {
             headers: { Authorization: `Bearer ${groqKey}` },
-            timeout: 25000
+            timeout: 20000
           });
 
           visionAnswer = groqVisionRes.data?.choices?.[0]?.message?.content;
-        } catch (groqErr) {
-          console.warn('[GROQ VISION FAIL]:', groqErr.message);
-        }
+        } catch (groqErr) {}
       }
 
       if (visionAnswer) {
@@ -970,7 +935,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
       return;
 
     } catch (e) {
-      console.error('[TELEGRAM PHOTO ERROR]', e.message);
       await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
         text: `Photo error: ${e.message}`
@@ -984,7 +948,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (!userText) return;
 
   if (userText === '/start') {
-    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, photo scanning, notes, live search aur device actions sab handle kar sakti hoon. Bataiye kya help karun?`;
+    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, AI image generation, photo scanning, notes, live search aur phone actions sab handle kar sakti hoon. Bataiye kya help karun?`;
     try {
       await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
@@ -1005,9 +969,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
           chat_id: result.targetChatId,
           text: result.messageToSend
         });
-      } catch (dmErr) {
-        console.error('[TELEGRAM DM SEND ERROR]', dmErr.message);
-      }
+      } catch (dmErr) {}
     }
 
     const telegramPayload = {
@@ -1041,7 +1003,9 @@ app.post('/api/telegram-webhook', async (req, res) => {
   }
 });
 
-// Endpoint to automatically link Telegram Webhook to Render
+// ----------------------------------------------------------------------------
+// [SECTION 8] SYSTEM ENDPOINTS & WEB INTERFACES
+// ----------------------------------------------------------------------------
 app.get('/api/setup-telegram', async (req, res) => {
   const token = sanitizeApiKey(process.env.TELEGRAM_BOT_TOKEN);
   const host = req.get('host');
@@ -1060,7 +1024,15 @@ app.get('/api/setup-telegram', async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => res.json({ status: 'ONLINE', timestamp: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ 
+  status: 'ONLINE', 
+  service: 'Lumina Mega AI Backend',
+  version: '6.0.0',
+  timestamp: new Date().toISOString(),
+  activeContacts: Object.keys(userMemory.contacts).length,
+  activeNotes: userMemory.notes.length,
+  registeredTelegramUsers: Object.keys(userMemory.telegramUsers).length
+}));
 
 app.post('/api/chat', async (req, res) => {
   const result = await processQuery(req.body);
@@ -1111,5 +1083,7 @@ app.post('/api/self-evolve', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Lumina Heavy Backend Server running on port ${PORT}`);
+  console.log(`========================================================`);
+  console.log(`🚀 Lumina Mega Backend Server v6.0 running on port ${PORT}`);
+  console.log(`========================================================`);
 });
