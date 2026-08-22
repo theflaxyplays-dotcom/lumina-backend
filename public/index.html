@@ -2,158 +2,790 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lumina AI Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LUMINA AI // HOLOGRAPHIC NEURAL INTERFACE</title>
+  
+  <!-- Google Fonts: Orbitron & Rajdhani -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background-color: #090A10; color: #FFFFFF; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 100vh; padding: 20px; }
-    header { text-align: center; margin-top: 10px; }
-    h1 { color: #00F0FF; font-size: 28px; letter-spacing: 4px; text-shadow: 0 0 12px rgba(0,240,255,0.8); }
-    .subtitle { color: #7000FF; font-size: 10px; letter-spacing: 2px; margin-top: 5px; font-weight: bold; }
-    
-    .sphere-container { display: flex; flex-direction: column; align-items: center; margin: 25px 0; }
-    .sphere { width: 180px; height: 180px; border-radius: 50%; border: 2px solid #00F0FF; box-shadow: 0 0 25px #00F0FF; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; animation: pulse 2s infinite; background: rgba(0,240,255,0.05); }
-    @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 20px #00F0FF; } 50% { transform: scale(1.08); box-shadow: 0 0 35px #00F0FF; } 100% { transform: scale(1); box-shadow: 0 0 20px #00F0FF; } }
-    .sphere-title { color: #00F0FF; font-weight: 900; font-size: 18px; letter-spacing: 3px; }
-    .sphere-sub { color: #8A8F9E; font-size: 9px; margin-top: 5px; }
-    
-    .card { width: 100%; max-width: 450px; background: #121420; border: 1px solid rgba(0,240,255,0.3); border-radius: 12px; padding: 16px; margin-bottom: 15px; min-height: 120px; }
-    .card-title { color: #00F0FF; font-size: 10px; margin-bottom: 8px; letter-spacing: 1.5px; }
-    .card-text { font-size: 13px; line-height: 1.5; color: #FFF; word-break: break-word; }
-    
-    .input-row { width: 100%; max-width: 450px; display: flex; gap: 8px; }
-    input { flex: 1; background: #121420; border: 1px solid rgba(0,240,255,0.3); border-radius: 8px; padding: 14px; color: #FFF; font-family: monospace; font-size: 13px; outline: none; }
-    button { background: #00F0FF; color: #090A10; border: none; border-radius: 8px; padding: 0 20px; font-weight: 900; font-family: monospace; cursor: pointer; }
-    
-    .extra-btn-row { width: 100%; max-width: 450px; display: flex; gap: 8px; margin-top: 10px; }
-    .action-btn { flex: 1; background: rgba(112,0,255,0.2); border: 1px solid #7000FF; color: #FFF; padding: 12px; border-radius: 8px; font-size: 11px; font-family: monospace; cursor: pointer; text-align: center; font-weight: bold; }
+    :root {
+      --cyan: #00F0FF;
+      --cyan-glow: rgba(0, 240, 255, 0.4);
+      --purple: #7000FF;
+      --purple-glow: rgba(112, 0, 255, 0.35);
+      --gold: #FFD700;
+      --pink: #FF007F;
+      --bg-dark: #060814;
+      --card-bg: rgba(12, 16, 32, 0.75);
+      --border-hud: rgba(0, 240, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 10%, rgba(112, 0, 255, 0.18), transparent 50%),
+        radial-gradient(circle at 50% 90%, rgba(0, 240, 255, 0.12), transparent 50%),
+        linear-gradient(180deg, #050711 0%, #080B1A 100%);
+      color: #FFFFFF;
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    #particles-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hud-wrapper {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 1;
+      position: relative;
+    }
+
+    header {
+      width: 100%;
+      text-align: center;
+      margin-top: 4px;
+      margin-bottom: 12px;
+    }
+
+    .hud-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border-hud);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+      margin-bottom: 6px;
+    }
+
+    .pulse-indicator {
+      width: 6px;
+      height: 6px;
+      background: #00FF66;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #00FF66;
+      animation: blinkIndicator 1.5s infinite;
+    }
+
+    @keyframes blinkIndicator {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      background: linear-gradient(135deg, #FFFFFF 20%, var(--cyan) 70%, #0099FF 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+      line-height: 1.1;
+    }
+
+    .system-status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(12, 16, 32, 0.8);
+      border: 1px solid var(--border-hud);
+      border-radius: 8px;
+      padding: 5px 12px;
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9BA3BF;
+      letter-spacing: 1px;
+      backdrop-filter: blur(8px);
+    }
+
+    .system-status-bar span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .reactor-stage {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 14px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .ring-outer {
+      position: absolute;
+      width: 210px;
+      height: 210px;
+      border: 2px dashed rgba(0, 240, 255, 0.35);
+      border-radius: 50%;
+      animation: spinOuter 16s linear infinite;
+    }
+
+    .ring-middle {
+      position: absolute;
+      width: 178px;
+      height: 178px;
+      border: 1.5px solid rgba(112, 0, 255, 0.5);
+      border-top-color: var(--cyan);
+      border-bottom-color: var(--pink);
+      border-radius: 50%;
+      animation: spinInner 9s linear infinite;
+    }
+
+    .ring-inner {
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      border: 1px dotted rgba(255, 215, 0, 0.4);
+      border-radius: 50%;
+      animation: spinOuter 6s linear infinite;
+    }
+
+    .core-orb {
+      position: relative;
+      width: 125px;
+      height: 125px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(0, 240, 255, 0.5) 0%, rgba(112, 0, 255, 0.35) 50%, rgba(6, 8, 20, 0.95) 100%);
+      border: 2px solid var(--cyan);
+      box-shadow: 0 0 35px var(--cyan-glow), inset 0 0 25px rgba(112, 0, 255, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      animation: breatheCore 3s ease-in-out infinite;
+    }
+
+    @keyframes spinOuter { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes spinInner { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    @keyframes breatheCore {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 30px var(--cyan-glow); }
+      50% { transform: scale(1.05); box-shadow: 0 0 50px rgba(0, 240, 255, 0.8), 0 0 25px var(--purple-glow); }
+    }
+
+    .core-orb.listening {
+      border-color: #00FF66;
+      box-shadow: 0 0 45px rgba(0, 255, 102, 0.8), inset 0 0 20px #00FF66;
+      animation: pulseListening 0.8s infinite alternate;
+    }
+
+    @keyframes pulseListening {
+      from { transform: scale(1.02); }
+      to { transform: scale(1.12); }
+    }
+
+    .core-status-text {
+      font-family: 'Orbitron', monospace;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      text-shadow: 0 0 12px var(--cyan);
+    }
+
+    .core-sub-text {
+      font-size: 9px;
+      font-weight: 700;
+      color: #9299B5;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+    }
+
+    .soundwave-bar {
+      display: flex;
+      gap: 3px;
+      margin-top: 6px;
+      height: 10px;
+      align-items: center;
+    }
+
+    .wave-line {
+      width: 3px;
+      height: 4px;
+      background: var(--cyan);
+      border-radius: 2px;
+    }
+
+    .hud-card {
+      width: 100%;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-hud);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.04);
+      min-height: 125px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+
+    .card-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: 2px;
+    }
+
+    .engine-tag {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--gold);
+      background: rgba(255, 215, 0, 0.12);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+    }
+
+    .card-body-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #E6EAF8;
+      font-weight: 600;
+      word-break: break-word;
+      white-space: pre-wrap;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .card-body-text::-webkit-scrollbar { width: 4px; }
+    .card-body-text::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 4px; }
+
+    /* Photo Upload Preview Pill */
+    .photo-preview-pill {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 240, 255, 0.15);
+      border: 1px solid var(--cyan);
+      padding: 4px 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      width: 100%;
+      font-size: 12px;
+      font-weight: 600;
+      color: #FFF;
+    }
+
+    .photo-preview-pill img {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      object-fit: cover;
+      border: 1px solid var(--cyan);
+    }
+
+    .photo-preview-remove {
+      margin-left: auto;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--pink);
+      font-weight: bold;
+    }
+
+    /* Input Bar with Camera & Submit */
+    .input-container {
+      width: 100%;
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .camera-btn {
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid var(--border-hud);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .camera-btn:active {
+      background: rgba(0, 240, 255, 0.3);
+      border-color: var(--cyan);
+      transform: scale(0.95);
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: rgba(10, 14, 28, 0.9);
+      border: 1px solid var(--border-hud);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #FFFFFF;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      outline: none;
+      transition: all 0.25s ease;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 16px var(--cyan-glow), inset 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    input::placeholder {
+      color: #555C75;
+      font-weight: 500;
+    }
+
+    .transmit-btn {
+      background: linear-gradient(135deg, var(--cyan) 0%, #0099FF 100%);
+      color: #050711;
+      border: none;
+      border-radius: 10px;
+      padding: 0 18px;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      box-shadow: 0 0 16px var(--cyan-glow);
+      height: 48px;
+      transition: transform 0.15s ease;
+    }
+
+    .transmit-btn:active {
+      transform: scale(0.96);
+    }
+
+    .action-matrix {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .hud-btn {
+      background: rgba(112, 0, 255, 0.12);
+      border: 1px solid rgba(112, 0, 255, 0.4);
+      color: #FFFFFF;
+      padding: 12px;
+      border-radius: 10px;
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .hud-btn:active {
+      background: rgba(112, 0, 255, 0.3);
+      border-color: var(--cyan);
+      transform: scale(0.97);
+    }
+
+    .hud-btn.torch-active {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow);
+      color: var(--cyan);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(5, 7, 17, 0.85);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: #0D1124;
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 35px var(--cyan-glow);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .modal-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--cyan);
+      letter-spacing: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      color: #9299B5;
+      font-size: 18px;
+    }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>LUMINA AI</h1>
-    <div class="subtitle">NEURAL NETWORK // HARDWARE CONTROLLER</div>
-  </header>
+  <canvas id="particles-canvas"></canvas>
 
-  <div class="sphere-container">
-    <div class="sphere" onclick="startVoiceInput()">
-      <div class="sphere-title" id="sphere-status">READY</div>
-      <div class="sphere-sub">TAP SPHERE FOR VOICE</div>
+  <div class="hud-wrapper">
+    <header>
+      <div class="hud-pill">
+        <span class="pulse-indicator"></span>
+        <span>STARK NEURAL CORE ONLINE</span>
+      </div>
+      <h1>LUMINA AI</h1>
+      <div class="system-status-bar">
+        <span><span style="color:var(--cyan)">●</span> 5TB DRIVE: SYNC</span>
+        <span id="live-clock">00:00:00 IST</span>
+        <span><span style="color:#00FF66">●</span> MULTI-MODEL</span>
+      </div>
+    </header>
+
+    <!-- CENTRAL INTERACTIVE ARC REACTOR -->
+    <div class="reactor-stage" onclick="startVoiceInput()">
+      <div class="ring-outer"></div>
+      <div class="ring-middle"></div>
+      <div class="ring-inner"></div>
+      <div class="core-orb" id="reactor-orb">
+        <div class="core-status-text" id="reactor-status">READY</div>
+        <div class="core-sub-text">TAP FOR VOICE</div>
+        <div class="soundwave-bar">
+          <div class="wave-line" style="animation: waveAnim 0.8s infinite 0.1s"></div>
+          <div class="wave-line" style="animation: waveAnim 0.8s infinite 0.3s"></div>
+          <div class="wave-line" style="animation: waveAnim 0.8s infinite 0.5s"></div>
+          <div class="wave-line" style="animation: waveAnim 0.8s infinite 0.2s"></div>
+          <div class="wave-line" style="animation: waveAnim 0.8s infinite 0.4s"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSMISSION FEED CARD -->
+    <div class="hud-card">
+      <div class="card-top">
+        <div class="card-label">// NEURAL TRANSMISSION FEED</div>
+        <div class="engine-tag" id="engine-tag">LUMINA ONLINE</div>
+      </div>
+      <div class="card-body-text" id="feed-output">LUMINA SYSTEM ONLINE // AWAITING FLAXY COMMAND...</div>
+    </div>
+
+    <!-- PHOTO ATTACHMENT PREVIEW BADGE -->
+    <div class="photo-preview-pill" id="photo-preview-box">
+      <img id="photo-preview-img" src="" alt="Selected Photo">
+      <span id="photo-preview-name">Photo Attached</span>
+      <span class="photo-preview-remove" onclick="removeAttachedPhoto()">&times;</span>
+    </div>
+
+    <!-- INPUT TERMINAL WITH CAMERA BUTTON -->
+    <div class="input-container">
+      <input type="file" id="camera-file-input" accept="image/*" style="display: none;" onchange="handlePhotoSelection(event)">
+      <div class="camera-btn" onclick="document.getElementById('camera-file-input').click()" title="Attach Photo / Camera">
+        📷
+      </div>
+      <input type="text" id="command-input" placeholder="Ask anything, scan photo, code..." onkeypress="if(event.key === 'Enter') transmitCommand()">
+      <button class="transmit-btn" onclick="transmitCommand()">SEND ⚡</button>
+    </div>
+
+    <!-- ACTION MATRIX -->
+    <div class="action-matrix">
+      <div class="hud-btn" id="torch-hud-btn" onclick="toggleHardwareTorchDirect()">
+        <span>🔦</span> <span>TORCH</span>
+      </div>
+      <div class="hud-btn" onclick="openImageGenModal()">
+        <span>🎨</span> <span>AI ART</span>
+      </div>
+      <div class="hud-btn" onclick="triggerSelfEvolve()">
+        <span>⚡</span> <span>EVOLVE</span>
+      </div>
+      <div class="hud-btn" onclick="sendTelegramTestAlert()">
+        <span>📱</span> <span>TELEGRAM</span>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">// LUMINA TRANSMISSION</div>
-    <div class="card-text" id="response-output">LUMINA SYSTEM ONLINE // READY FOR COMMANDS</div>
-  </div>
-
-  <div class="input-row">
-    <input type="text" id="user-prompt" placeholder="Transmit natural language command..." onkeypress="if(event.key === 'Enter') sendQuery()">
-    <button onclick="sendQuery()">TRANSMIT</button>
-  </div>
-
-  <div class="extra-btn-row">
-    <div class="action-btn" onclick="triggerSelfEvolve()">+ SELF-EVOLVE FEATURE</div>
-    <div class="action-btn" onclick="sendTelegramAlert()">📱 TEST TELEGRAM</div>
+  <!-- AI ART GENERATOR MODAL -->
+  <div class="modal-overlay" id="image-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>🎨 FLUX AI IMAGE GENERATOR</span>
+        <span class="modal-close" onclick="closeImageGenModal()">&times;</span>
+      </div>
+      <input type="text" id="art-prompt-input" placeholder="e.g. Cyberpunk neon samurai in rain 4K">
+      <button class="transmit-btn" style="padding: 14px; width: 100%;" onclick="submitImageGen()">GENERATE HD IMAGE ✨</button>
+    </div>
   </div>
 
   <script>
-    let torchTrack = null;
+    let attachedBase64Image = null;
 
-    async function toggleHardwareTorch(turnOn) {
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // -------------------------------------------------------------
+    // PHOTO UPLOAD & BASE64 CONVERTER
+    // -------------------------------------------------------------
+    function handlePhotoSelection(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const fullBase64 = e.target.result;
+        attachedBase64Image = fullBase64.split(',') || fullBase64;
+
+        document.getElementById('photo-preview-img').src = fullBase64;
+        document.getElementById('photo-preview-name').innerText = file.name || 'Photo Attached';
+        document.getElementById('photo-preview-box').style.display = 'flex';
+        document.getElementById('command-input').placeholder = 'Ask a question about this photo...';
+        document.getElementById('command-input').focus();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeAttachedPhoto() {
+      attachedBase64Image = null;
+      document.getElementById('camera-file-input').value = '';
+      document.getElementById('photo-preview-box').style.display = 'none';
+      document.getElementById('command-input').placeholder = 'Ask anything, scan photo, code...';
+    }
+
+    // -------------------------------------------------------------
+    // HARDWARE TORCH CONTROL
+    // -------------------------------------------------------------
+    let torchTrack = null;
+    let isTorchActive = false;
+
+    async function toggleHardwareTorch(enable) {
+      const torchBtn = document.getElementById('torch-hud-btn');
       try {
-        if (turnOn) {
+        if (enable) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' }
           });
           torchTrack = stream.getVideoTracks()[0];
           await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+          isTorchActive = true;
+          torchBtn.classList.add('torch-active');
           return true;
         } else {
           if (torchTrack) {
             torchTrack.stop();
             torchTrack = null;
           }
+          isTorchActive = false;
+          torchBtn.classList.remove('torch-active');
           return true;
         }
-      } catch (e) {
-        console.log('Torch Hardware Note:', e.message);
+      } catch (err) {
+        console.warn('Torch note:', err.message);
       }
       return false;
     }
 
-    async function sendQuery(textPrompt) {
-      const promptInput = document.getElementById('user-prompt');
-      const userText = textPrompt || promptInput.value;
-      if (!userText.trim()) return;
+    function toggleHardwareTorchDirect() {
+      transmitCommand(isTorchActive ? "Torch off karo" : "Torch on karo");
+    }
 
-      const output = document.getElementById('response-output');
-      const sphereStatus = document.getElementById('sphere-status');
-      
-      output.innerText = 'PROCESSING VIA LUMINA AI...';
-      sphereStatus.innerText = 'PROCESSING';
+    // -------------------------------------------------------------
+    // COMMAND TRANSMISSION WITH PHOTO SUPPORT
+    // -------------------------------------------------------------
+    async function transmitCommand(customText) {
+      const inputElem = document.getElementById('command-input');
+      const query = customText || inputElem.value;
+      if (!query.trim() && !attachedBase64Image) return;
+
+      const outputElem = document.getElementById('feed-output');
+      const orbElem = document.getElementById('reactor-orb');
+      const statusElem = document.getElementById('reactor-status');
+      const engineTag = document.getElementById('engine-tag');
+
+      outputElem.innerText = attachedBase64Image ? 'ANALYZING ATTACHED PHOTO VIA VISION AI...' : 'SYNTHESIZING NEURAL PATHWAY...';
+      statusElem.innerText = 'PROCESSING';
+      engineTag.innerText = attachedBase64Image ? 'VISION AI' : 'CALCULATING';
+
+      const payload = {
+        prompt: query || 'Is photo ko analyze karke short aur smart answer do.'
+      };
+
+      if (attachedBase64Image) {
+        payload.image = attachedBase64Image;
+      }
 
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userText })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
-        const text = data.text || 'Command executed successfully.';
-        
-        output.innerText = text;
-        sphereStatus.innerText = 'SPEAKING';
-        
-        // HARDWARE TORCH FLASHLIGHT EXECUTION
-        if (data.action === 'torch_on') {
-          toggleHardwareTorch(true);
-        } else if (data.action === 'torch_off') {
-          toggleHardwareTorch(false);
-        }
+        const replyText = data.text || 'Command executed successfully.';
 
-        // AUTOMATIC DIRECT APP OPENING
+        outputElem.innerText = replyText;
+        statusElem.innerText = 'SPEAKING';
+        engineTag.innerText = (data.provider || 'LUMINA CORE').toUpperCase();
+
+        if (data.action === 'torch_on') toggleHardwareTorch(true);
+        else if (data.action === 'torch_off') toggleHardwareTorch(false);
+
         if (data.url) {
           setTimeout(() => {
             window.location.href = data.url;
-          }, 600);
+          }, 750);
         }
 
         if ('speechSynthesis' in window) {
-          const speech = new SpeechSynthesisUtterance(text);
-          speech.onend = () => { sphereStatus.innerText = 'READY'; };
-          window.speechSynthesis.speak(speech);
+          const utterance = new SpeechSynthesisUtterance(replyText.replace(/[*_~`]/g, ''));
+          utterance.lang = 'hi-IN';
+          utterance.onend = () => { statusElem.innerText = 'READY'; };
+          utterance.onerror = () => { statusElem.innerText = 'READY'; };
+          window.speechSynthesis.speak(utterance);
         } else {
-          sphereStatus.innerText = 'READY';
+          statusElem.innerText = 'READY';
         }
+
       } catch (e) {
-        output.innerText = 'Lumina System: Command executed.';
-        sphereStatus.innerText = 'READY';
+        outputElem.innerText = 'Lumina System: Command processed.';
+        statusElem.innerText = 'READY';
       }
-      promptInput.value = '';
+
+      removeAttachedPhoto();
+      inputElem.value = '';
     }
 
+    // -------------------------------------------------------------
+    // SPEECH RECOGNITION
+    // -------------------------------------------------------------
     function startVoiceInput() {
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const rec = new SpeechRecognition();
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SpeechRec();
         rec.lang = 'hi-IN';
-        document.getElementById('sphere-status').innerText = 'LISTENING';
+        rec.continuous = false;
+
+        const orb = document.getElementById('reactor-orb');
+        const status = document.getElementById('reactor-status');
+
+        orb.classList.add('listening');
+        status.innerText = 'LISTENING';
+
         rec.start();
-        rec.onresult = (event) => sendQuery(event.results[0][0].transcript);
-        rec.onerror = () => { document.getElementById('sphere-status').innerText = 'READY'; };
+        rec.onresult = (e) => {
+          orb.classList.remove('listening');
+          transmitCommand(e.results[0][0].transcript);
+        };
+        rec.onerror = () => {
+          orb.classList.remove('listening');
+          status.innerText = 'READY';
+        };
+        rec.onend = () => {
+          orb.classList.remove('listening');
+          status.innerText = 'READY';
+        };
       } else {
-        alert('Voice recognition works in Chrome browser.');
+        alert('Voice recognition Chrome / Brave browser par best chalti hai.');
+      }
+    }
+
+    // -------------------------------------------------------------
+    // MODAL TRIGGERS
+    // -------------------------------------------------------------
+    function openImageGenModal() {
+      document.getElementById('image-modal').style.display = 'flex';
+      document.getElementById('art-prompt-input').focus();
+    }
+    function closeImageGenModal() {
+      document.getElementById('image-modal').style.display = 'none';
+    }
+    function submitImageGen() {
+      const promptText = document.getElementById('art-prompt-input').value;
+      if (promptText.trim()) {
+        closeImageGenModal();
+        transmitCommand(promptText + " ki image banao");
       }
     }
 
     async function triggerSelfEvolve() {
-      const featurePrompt = window.prompt('Enter new feature to self-program:', 'Add an alarm feature that messages me on Telegram after 1 minute');
+      const featurePrompt = window.prompt('Enter new feature to program into Lumina:', 'Set a 1 minute alarm reminder');
       if (!featurePrompt) return;
 
-      const output = document.getElementById('response-output');
-      output.innerText = 'SELF-EVOLVING ENGINE PROGRAMMING NEW FEATURE...';
+      const output = document.getElementById('feed-output');
+      output.innerText = 'PROGRAMMING SELF-EVOLVING ENGINE...';
 
       try {
         const res = await fetch('/api/self-evolve', {
@@ -162,15 +794,60 @@
           body: JSON.stringify({ prompt: featurePrompt })
         });
         const data = await res.json();
-        output.innerText = data.message || 'Yeh feature add ho gaya hai, aur kuch add karna hai?';
+        output.innerText = data.message || 'Feature successfully scheduled!';
       } catch (err) {
-        output.innerText = 'Yeh feature add ho gaya hai, aur kuch add karna hai?';
+        output.innerText = 'Feature active!';
       }
     }
 
-    async function sendTelegramAlert() {
-      sendQuery('Send a test notification alert on my Telegram bot');
+    function sendTelegramTestAlert() {
+      transmitCommand('Send a test notification alert on my Telegram bot');
     }
+
+    // -------------------------------------------------------------
+    // PARTICLES CANVAS
+    // -------------------------------------------------------------
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    for (let i = 0; i < 45; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 1.5 + 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+        dy: (Math.random() - 0.5) * 0.4,
+        opacity: Math.random() * 0.6 + 0.2
+      });
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00F0FF';
+      particles.forEach(p => {
+        ctx.globalAlpha = p.opacity;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        p.x += p.dx;
+        p.y += p.dy;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+      });
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
   </script>
 </body>
 </html>
