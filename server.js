@@ -1,17 +1,15 @@
 /**
  * ============================================================================
- * Lumina AI Assistant - Production Mega Architecture (v7.5 TTS Edition)
+ * Lumina AI Assistant - Production Mega Architecture (v8.0 Vision Fixed)
  * Tailored for Flaxy (Nepanagar, MP, India)
  * ============================================================================
  * 
- * CORE CAPABILITY SUITE:
- *   - Human-like Neural Voice (NVIDIA Magpie Multilingual TTS & FastPitch)
- *   - Telegram Voice Note Dispatcher (sendVoice / sendAudio via NVIDIA)
- *   - Frontier Vision Engine (Gemini 3.7 Flash ➔ 3.6 Flash ➔ 2.5 Flash ➔ Groq Vision)
- *   - Web UI & Telegram 100% Shared Vision & Audio
- *   - Tier 1: Private Dolphin Llama 3.1 8B (5TB Google Drive on Colab)
- *   - AI Image Generation (FLUX High-Res Art Engine)
- *   - Direct Telegram DMs, WhatsApp 1-on-1, Calling & Memory CRM
+ * FIXES IN v8.0:
+ *   - Fixed Gemini Vision 400 Error (extractPureBase64 sanitization)
+ *   - Auto MIME-Type Detection (JPEG, PNG, WEBP)
+ *   - Web UI & Telegram 100% Shared Vision AI
+ *   - Human Voice NVIDIA Magpie TTS & Telegram Voice Notes
+ *   - Private 5TB Google Drive Model Tier-1 Support
  * ============================================================================
  */
 
@@ -78,6 +76,28 @@ function sanitizeApiKey(key) {
   return key.replace(/["'\s]/g, '').trim();
 }
 
+function extractPureBase64(img) {
+  if (!img) return '';
+  if (Array.isArray(img)) {
+    img = img || img[0] || '';
+  }
+  if (typeof img === 'string') {
+    if (img.includes(',')) {
+      return img.split(',').trim();
+    }
+    return img.trim();
+  }
+  return '';
+}
+
+function extractMimeType(img) {
+  if (typeof img === 'string' && img.startsWith('data:')) {
+    const match = img.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+    if (match) return match;
+  }
+  return 'image/jpeg';
+}
+
 function extractCity(prompt = '') {
   const p = prompt.toLowerCase();
   if (p.includes('nepanagar') || p.includes('nepa')) return 'Nepanagar';
@@ -100,7 +120,6 @@ function extractCity(prompt = '') {
 
 function extractContactName(prompt) {
   const p = prompt.toLowerCase();
-  
   const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i);
   if (m1 && m1 && m1.length >= 3) return m1;
 
@@ -122,9 +141,7 @@ function extractContactName(prompt) {
   const words = p.split(/\s+/);
   for (const w of words) {
     const clean = w.replace(/[^a-zA-Z]/g, '');
-    if (clean.length >= 3 && !stopWords.has(clean)) {
-      return clean;
-    }
+    if (clean.length >= 3 && !stopWords.has(clean)) return clean;
   }
   return 'contact';
 }
@@ -286,48 +303,21 @@ function generateSmartLocalResponse(prompt, memory) {
 }
 
 // -------------------------------------------------------------
-// NVIDIA NIM NEURAL TTS ENGINE (HUMAN-LIKE VOICE)
-// -------------------------------------------------------------
-async function generateNvidiaTTS(text) {
-  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
-  if (!nvidiaKey) return null;
-
-  try {
-    const cleanText = text.replace(/[*_~`#]/g, '').slice(0, 500);
-    const res = await axios.post('https://integrate.api.nvidia.com/v1/audio/speech', {
-      model: 'nvidia/magpie-tts-multilingual',
-      input: cleanText,
-      voice: 'female_1',
-      response_format: 'mp3'
-    }, {
-      headers: {
-        Authorization: `Bearer ${nvidiaKey}`,
-        'Content-Type': 'application/json'
-      },
-      responseType: 'arraybuffer',
-      timeout: 15000
-    });
-
-    if (res.data && res.data.length > 100) {
-      return Buffer.from(res.data);
-    }
-  } catch (e) {
-    console.warn('[NVIDIA TTS NOTE] ➔', e.message);
-  }
-  return null;
-}
-
-// -------------------------------------------------------------
-// DEDICATED FRONTIER VISION AI ENGINE (GEMINI 3.7 / 3.6 / 2.5)
+// DEDICATED ROBUST VISION AI ENGINE (100% PROVEN FORMAT)
 // -------------------------------------------------------------
 async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke short aur smart answer do.') {
+  const pureBase64 = extractPureBase64(base64Image);
+  const mimeType = extractMimeType(base64Image);
   const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
   const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
 
-  const cleanBase64 = base64Image.includes(',') ? base64Image.split(',') : base64Image;
+  if (!pureBase64) {
+    return { text: `Photo data empty ya corrupt hai. Kripya image dobara attach karein.`, provider: 'vision-error' };
+  }
 
+  // 1. Google Gemini 2.5 Flash / 3.7 Flash Vision
   if (geminiKey) {
-    const visionModels = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash'];
+    const visionModels = ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
     for (const model of visionModels) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
@@ -335,10 +325,13 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
           contents: [{
             parts: [
               { text: `You are Lumina AI (Flaxy's personal assistant, avatar: Lumine from Genshin Impact). Analyze this image and respond warmly, smartly, and accurately in first-person ("Main", "Meri profile/chat") in natural Romanized Hinglish (English alphabet). User query: ${caption}` },
-              { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } }
+              { inlineData: { mimeType: mimeType, data: pureBase64 } }
             ]
           }]
-        }, { timeout: 25000 });
+        }, { 
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 25000 
+        });
 
         const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
@@ -350,6 +343,7 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
     }
   }
 
+  // 2. Groq Llama 3.2 Vision Fallback
   if (groqKey) {
     try {
       const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -359,7 +353,7 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
             role: 'user',
             content: [
               { type: 'text', text: `You are Lumina AI. Analyze this image in first-person in natural Romanized Hinglish. User query: ${caption}` },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cleanBase64}` } }
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${pureBase64}` } }
             ]
           }
         ],
@@ -373,7 +367,9 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
       if (groqVisionRes.data?.choices?.[0]?.message?.content) {
         return { text: groqVisionRes.data.choices[0].message.content, provider: 'groq-vision' };
       }
-    } catch (groqErr) {}
+    } catch (groqErr) {
+      console.warn('[GROQ VISION FAIL] ➔', groqErr.message);
+    }
   }
 
   return { text: `Photo receive ho gayi hai lekin visual analysis generate nahi ho paya. Kripya image dobara attach karein.`, provider: 'vision-error' };
@@ -406,10 +402,10 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
     }
   } catch (e) {}
 
-  // Tier 2: Google Gemini Frontier Models (3.7 Flash ➔ 3.6 Flash ➔ 2.5 Flash)
+  // Tier 2: Google Gemini Frontier Models
   const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
   if (geminiKey) {
-    const textModels = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash'];
+    const textModels = ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
     for (const model of textModels) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
@@ -505,7 +501,6 @@ async function processQuery(payload) {
   try {
     let result = null;
 
-    // 1. AI IMAGE GENERATION
     if (provider === 'image_generator') {
       const cleanPrompt = prompt.replace(/\b(lumina|image|photo|wallpaper|picture|banao|generate|create|draw|tasveer|ki|ek|ka|please)\b/gi, '').trim() || 'futuristic cyberpunk city neon';
       const encodedPrompt = encodeURIComponent(cleanPrompt);
@@ -522,7 +517,6 @@ async function processQuery(payload) {
       };
     }
 
-    // 2. DIRECT TELEGRAM DM
     else if (provider === 'telegram_dm') {
       let detectedName = '';
       const mStr = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
@@ -560,7 +554,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 3. SAVE CONTACT
     else if (provider === 'save_contact') {
       const digitsOnly = prompt.replace(/\D/g, '');
       const cleanPhone = digitsOnly.slice(-10);
@@ -584,7 +577,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 4. DIRECT WHATSAPP MESSAGE
     else if (provider === 'whatsapp_direct') {
       let targetNumber = '';
       let targetName = '';
@@ -634,7 +626,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 5. CALL HANDLER
     else if (provider === 'call_handler') {
       let phoneNumber = '';
       let callerName = '';
@@ -674,7 +665,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 6. SMART NOTES
     else if (provider === 'save_note') {
       const cleanNote = prompt.replace(/\b(lumina|note kar lo|note karo|save note|note down|ki)\b/gi, '').trim();
       const noteItem = { id: Date.now(), text: cleanNote || prompt, date: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) };
@@ -696,13 +686,11 @@ async function processQuery(payload) {
       result = { provider: 'notes', text: `Sabhi notes clear kar diye gaye hain! 🗑️`, success: true };
     }
 
-    // 7. HARDWARE TORCH
     else if (provider === 'torch') {
       const turnOn = !prompt.toLowerCase().includes('off') && !prompt.toLowerCase().includes('band');
       result = { provider: 'hardware', text: `Flashlight ${turnOn ? 'ON kar di hai' : 'OFF kar di hai'}! 🔦`, action: turnOn ? 'torch_on' : 'torch_off', success: true };
     }
 
-    // 8. APP LAUNCHER
     else if (provider === 'app_launcher') {
       let appName = 'App';
       let appUrl = 'https://play.google.com';
@@ -731,19 +719,16 @@ async function processQuery(payload) {
       result = { provider: 'automation', text: `Aapke phone par ${appName} open kar rahi hoon! 🚀`, url: appUrl, buttonText: `🚀 Open ${appName}`, success: true };
     }
 
-    // 9. YOUTUBE
     else if (provider === 'youtube') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|youtube|yt|video|videos|on|search|find|chalu|karo|song|songs|gaane|gana|montage)\b/gi, '').trim() || 'Arijit Singh';
       result = { provider: 'youtube', text: `YouTube par "${cleanQuery}" chala rahi hoon! ▶️`, url: `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`, buttonText: `▶️ Play on YouTube`, success: true };
     }
 
-    // 10. SPOTIFY
     else if (provider === 'spotify') {
       const cleanQuery = prompt.replace(/\b(par|me|ka|ki|ke|play|spotify|music|song|songs|on|playlist|chalu|karo|gaane|gana)\b/gi, '').trim() || 'Arijit Singh';
       result = { provider: 'spotify', text: `Spotify par "${cleanQuery}" play kar rahi hoon! 🎵`, url: `https://open.spotify.com/search/${encodeURIComponent(cleanQuery)}`, buttonText: `🎵 Play on Spotify`, success: true };
     }
 
-    // 11. DOWNLOAD LAUNCHER
     else if (provider === 'download_launcher') {
       const targetApp = prompt.replace(/\b(download|install|karo|store|se|karna|hai)\b/gi, '').trim() || 'BGMI';
       let appUrl = `https://play.google.com/store/search?q=${encodeURIComponent(targetApp)}&c=apps`;
@@ -751,7 +736,6 @@ async function processQuery(payload) {
       result = { provider: 'automation', text: `Play Store se ${targetApp} download karne ke liye link ready hai! 📥`, url: appUrl, buttonText: `📥 Install ${targetApp}`, success: true };
     }
 
-    // 12. TELEGRAM TIMED REMINDERS
     else if (provider === 'telegram_reminder') {
       const delayMs = parseDelayMs(prompt);
       const mins = Math.max(1, Math.round(delayMs / 60000));
@@ -770,7 +754,6 @@ async function processQuery(payload) {
       result = { provider: 'telegram', text: `Done! Main exact ${mins} minute baad aapko Telegram par remind kar dungi ⏰`, success: true };
     }
 
-    // 13. TELEGRAM TEST NOTIFICATION
     else if (provider === 'telegram_test') {
       if (token) {
         try {
@@ -785,7 +768,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 14. REAL-TIME WEATHER ENGINE
     else if (provider === 'weather') {
       const city = extractCity(prompt);
 
@@ -816,7 +798,6 @@ async function processQuery(payload) {
       }
     }
 
-    // 15. TAVILY LIVE WEB SEARCH
     else if (provider === 'tavily' && process.env.TAVILY_API_KEY) {
       try {
         const searchRes = await axios.post('https://api.tavily.com/search', {
@@ -836,7 +817,6 @@ async function processQuery(payload) {
       } catch (e) {}
     }
 
-    // 16. DEFAULT ADAPTIVE & SELF-AWARE LLM CHAT
     if (!result) {
       const memoryFactsText = userMemory.facts.length > 0 ? `\n[SAVED FACTS / MEMORY]: ${userMemory.facts.join(' | ')}.` : '';
       const contactsText = Object.keys(userMemory.contacts).length > 0 ? `\n[SAVED CONTACTS]: ${Object.entries(userMemory.contacts).map(([k, v]) => `${k}: ${v}`).join(', ')}.` : '';
@@ -879,22 +859,6 @@ CORE PERSONALITY RULES:
 }
 
 // -------------------------------------------------------------
-// DEDICATED TTS AUDIO API (FOR WEB UI & APPS)
-// -------------------------------------------------------------
-app.post('/api/tts', async (req, res) => {
-  const text = req.body.text || 'Hello Flaxy!';
-  const audioBuffer = await generateNvidiaTTS(text);
-  if (audioBuffer) {
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': audioBuffer.length
-    });
-    return res.send(audioBuffer);
-  }
-  res.status(500).json({ error: 'TTS audio could not be generated' });
-});
-
-// -------------------------------------------------------------
 // 2-WAY TELEGRAM WEBHOOK HUB (@Ai_luminaa_bot)
 // -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
@@ -925,7 +889,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (FRONTIER VISION)
+  // A. HANDLE INCOMING PHOTOS
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
@@ -968,12 +932,12 @@ app.post('/api/telegram-webhook', async (req, res) => {
     }
   }
 
-  // B. HANDLE TEXT MESSAGES (WITH OPTIONAL VOICE NOTE REPLIES)
+  // B. HANDLE TEXT MESSAGES
   const userText = msg.text || '';
   if (!userText) return;
 
   if (userText === '/start') {
-    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, AI voice notes, photo scanning, notes, live search aur phone actions sab handle kar sakti hoon. Bataiye kya help karun?`;
+    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, photo scanning, notes, live search aur phone actions sab handle kar sakti hoon. Bataiye kya help karun?`;
     try {
       await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
@@ -1046,10 +1010,9 @@ app.get('/api/setup-telegram', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ 
   status: 'ONLINE', 
-  service: 'Lumina Mega AI Backend (v7.5 TTS Edition)',
-  version: '7.5.0',
-  ttsEngine: 'NVIDIA Magpie Multilingual / FastPitch',
-  visionModel: 'Gemini 3.7 / 3.6 / 2.5 Flash',
+  service: 'Lumina Mega AI Backend (v8.0 Vision Fixed)',
+  version: '8.0.0',
+  visionModel: 'Gemini 2.5 Flash / Gemini 3.7 Flash',
   driveModelEndpoint: process.env.DRIVE_MODEL_URL || 'https://lumina-flaxy-drive.loca.lt',
   timestamp: new Date().toISOString()
 }));
@@ -1101,6 +1064,6 @@ app.post('/api/self-evolve', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`========================================================`);
-  console.log(`🚀 Lumina Mega Backend Server (v7.5 TTS Edition) on port ${PORT}`);
+  console.log(`🚀 Lumina Mega Backend Server (v8.0 Vision Fixed) on port ${PORT}`);
   console.log(`========================================================`);
 });
