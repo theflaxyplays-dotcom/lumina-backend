@@ -1,23 +1,18 @@
 /**
  * ============================================================================
- * Lumina AI Assistant - Production Mega Architecture (v6.0)
+ * Lumina AI Assistant - Production Mega Architecture (v6.5 Drive Edition)
  * Tailored for Flaxy (Nepanagar, MP, India)
  * ============================================================================
  * 
  * CORE CAPABILITY SUITE:
- *   Multi-Model LLM Matrix (Groq Llama 3.3 + Gemini 2.5 + NVIDIA Nemotron)
- *   AI Image Generation Pipeline (FLUX / Pollinations High-Res Art Engine)
+ *   Tier 1: Private Dolphin Llama 3.1 8B (Hosted on Colab from 5TB Google Drive)
+ *   Tier 2: Google Gemini 2.5 Flash (Reliable Fast Multimodal Fallback)
+ *   Tier 3: NVIDIA Nemotron 70B (Deep Coding & Logic Fallback)
+ *   Tier 4: Groq Llama 3.3 70B
+ *   Tier 5: Pollinations AI & Smart Local Engine
+ *   AI Image Generation (FLUX Art Engine)
  *   2-Way Interactive Telegram Webhook Hub (@Ai_luminaa_bot)
- *   Cross-Modal Vision AI (Google Gemini 2.5 Flash + Groq Vision)
- *   Direct Telegram DM Dispatcher (Auto-resolves chat IDs from memory/live)
- *   1-on-1 Direct WhatsApp Messenger with clean intent parsing
- *   Smart Phone Dialer with contact book resolution (No 400 error)
- *   Long-Term Memory CRM & Auto Fact Extractor (lumina_user_memory.json)
- *   Smart Notes & Timed Task/Reminder Engine
- *   Live Weather Engine (OpenWeatherMap + Tavily MP fallback)
- *   Real-Time Live Web Search Intelligence (Tavily Search API)
- *   Hardware Flashlight & Android App Hub (YouTube, Spotify, Games, Tools)
- *   Self-Evolution & Dynamic Feature Dispatcher
+ *   Direct Telegram DMs, WhatsApp 1-on-1, Calling & Memory CRM
  * ============================================================================
  */
 
@@ -35,7 +30,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security & Parsing Middlewares
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: '*' }));
 app.use(morgan('dev'));
@@ -43,9 +37,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 
-// ----------------------------------------------------------------------------
-// [SECTION 1] PERSISTENT STORAGE & MEMORY CRM MATRIX
-// ----------------------------------------------------------------------------
 const MEMORY_FILE = path.join(process.cwd(), 'lumina_user_memory.json');
 
 function loadUserMemory() {
@@ -60,9 +51,7 @@ function loadUserMemory() {
       if (!data.userProfile) data.userProfile = { home: 'Nepanagar, MP', name: 'Flaxy' };
       return data;
     }
-  } catch (e) {
-    console.warn('[MEMORY LOAD WARNING]', e.message);
-  }
+  } catch (e) {}
   return { 
     facts: ["User home: Nepanagar, MP", "User name: Flaxy"], 
     userProfile: { home: 'Nepanagar, MP', name: 'Flaxy' },
@@ -76,9 +65,7 @@ function loadUserMemory() {
 function saveUserMemory(memoryData) {
   try { 
     fs.writeFileSync(MEMORY_FILE, JSON.stringify(memoryData, null, 2), 'utf8'); 
-  } catch (e) {
-    console.error('[MEMORY SAVE ERROR]', e.message);
-  }
+  } catch (e) {}
 }
 
 let userMemory = loadUserMemory();
@@ -92,9 +79,6 @@ function sanitizeApiKey(key) {
   return key.replace(/["'\s]/g, '').trim();
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 2] INTELLIGENT PARSING & EXTRACTION ENGINES
-// ----------------------------------------------------------------------------
 function extractCity(prompt = '') {
   const p = prompt.toLowerCase();
   if (p.includes('nepanagar') || p.includes('nepa')) return 'Nepanagar';
@@ -149,7 +133,6 @@ function extractContactName(prompt) {
 function extractAndSaveUserFacts(prompt) {
   let updated = false;
 
-  // Name Extraction
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
   if (nameMatch && nameMatch) {
     const extractedName = nameMatch.trim();
@@ -160,7 +143,6 @@ function extractAndSaveUserFacts(prompt) {
     updated = true;
   }
 
-  // Home / Location Extraction
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
   if (homeMatch && homeMatch) {
     const extractedHome = homeMatch.trim();
@@ -171,7 +153,6 @@ function extractAndSaveUserFacts(prompt) {
     updated = true;
   }
 
-  // Natural Language Contact Auto-Save
   const digitsOnly = prompt.replace(/\D/g, '');
   if (digitsOnly.length >= 10) {
     const cleanNum = digitsOnly.slice(-10);
@@ -189,7 +170,6 @@ function extractAndSaveUserFacts(prompt) {
     }
   }
 
-  // Generic Fact Memoization
   const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
   if (rememberMatch && rememberMatch) {
     const fact = rememberMatch.trim();
@@ -215,18 +195,13 @@ function parseDelayMs(prompt = '') {
   return delayMinutes * 60 * 1000;
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 3] DYNAMIC TELEGRAM USER RESOLVER & DISPATCHER
-// ----------------------------------------------------------------------------
 async function resolveTelegramUser(targetName, token) {
-  // 1. Check in-memory telegramUsers
   for (const [chatId, u] of Object.entries(userMemory.telegramUsers)) {
     if (new RegExp(`\\b${u.name}\\b`, 'i').test(targetName) || (u.username && new RegExp(`\\b${u.username}\\b`, 'i').test(targetName))) {
       return { targetUser: u, targetChatId: chatId };
     }
   }
 
-  // 2. Query live updates from Telegram API if available
   if (token) {
     try {
       const updatesRes = await axios.get(`https://api.telegram.org/bot${token}/getUpdates?limit=50`, { timeout: 8000 });
@@ -253,75 +228,50 @@ async function resolveTelegramUser(targetName, token) {
   return null;
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 4] MASTER INTENT ROUTER (NO COLLISION / HIGH PRECISION)
-// ----------------------------------------------------------------------------
 function classifyRoute(payload) {
   const prompt = (payload.prompt || '').toLowerCase();
   const digitsOnly = prompt.replace(/\D/g, '');
 
-  // 1. AI Image Generation (FLUX / Pollinations Art Engine)
   if (/\b(image banao|photo banao|wallpaper banao|picture banao|generate image|create image|draw image|draw|tasveer)\b/i.test(prompt) && !/\b(scan|analyze|dekho|dakho|kya hai|read)\b/i.test(prompt)) {
     return 'image_generator';
   }
 
-  // 2. Direct Telegram DM to another user
   if (/\b(telegram|tele)\b/i.test(prompt) && /\b(message|msg|massage|bhejo|bajo|bhej|send|karo|bolo|bol|text)\b/i.test(prompt)) {
     return 'telegram_dm';
   }
 
-  // 3. Telegram Timed Reminder / Alarm
   if (/\b(reminder|remind|alarm|yaad dilana|yaad dilao|alert)\b/i.test(prompt) && /\b(minute|minutes|min|mins|hour|hours|ghante|sec|seconds)\b/i.test(prompt)) {
     return 'telegram_reminder';
   }
 
-  // 4. Telegram Explicit Test Alert
   if (/\b(test telegram|telegram test|test notification|test alert)\b/i.test(prompt)) {
     return 'telegram_test';
   }
 
-  // 5. Contact Save
   if (/\b(save contact|number save|contact save)\b/i.test(prompt) || (/\b(save|yaad|rakhna)\b/i.test(prompt) && digitsOnly.length >= 10)) {
     return 'save_contact';
   }
 
-  // 6. Direct WhatsApp Message
   if (/\b(whatsapp|wa)\b/i.test(prompt) && !prompt.includes('download') && !prompt.includes('install')) {
     return 'whatsapp_direct';
   }
 
-  // 7. Calling & Phone Dialer
   if (/\b(call|dial|dialer|phone|lagao)\b/i.test(prompt) || digitsOnly.length >= 10) {
     return 'call_handler';
   }
 
-  // 8. Smart Notes Matrix
   if (/\b(note kar lo|note karo|save note|note down|kuch note karna hai)\b/i.test(prompt)) return 'save_note';
   if (/\b(mere notes|show notes|read notes|kya note kiya|list notes|reminders)\b/i.test(prompt)) return 'read_notes';
   if (/\b(clear notes|delete all notes|delete notes)\b/i.test(prompt)) return 'clear_notes';
 
-  // 9. Hardware Torch / Flashlight
   if (/\b(torch|flashlight)\b/i.test(prompt)) return 'torch';
-
-  // 10. YouTube Media
   if (/\b(youtube|yt)\b/i.test(prompt) && /\b(song|songs|video|videos|montage|music|gaana|gaane|chalu|play|search)\b/i.test(prompt)) return 'youtube';
-
-  // 11. Spotify Media
   if (/\b(spotify)\b/i.test(prompt)) return 'spotify';
-
-  // 12. Play Store Downloads
   if (/\b(download|install)\b/i.test(prompt)) return 'download_launcher';
-
-  // 13. App Launcher (Android / Web intents)
   if (/\b(kholo|open|launch|chalu)\b/i.test(prompt) && !/\b(song|video|gaana|music)\b/i.test(prompt)) return 'app_launcher';
-
-  // 14. Real-Time Weather
   if (/\b(weather|temperature|forecast|mausam|rain|rainy|barish)\b/i.test(prompt)) return 'weather';
-
-  // 15. Live Web Search (Tavily)
   if (/\b(live score|cricket score|match score|stock price|gold price|bitcoin price|latest news today|search)\b/i.test(prompt)) return 'tavily';
 
-  // 16. Default Multi-Model LLM Brain
   return 'llm_fallback_chain';
 }
 
@@ -339,57 +289,39 @@ function generateSmartLocalResponse(prompt, memory) {
   return `Ji ${userName}, maine samajh liya. Main aapki madad ke liye yahan ready hoon!`;
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 5] ULTRA-FAST MULTI-MODEL LLM ENGINE (0.5s SPEED)
-// ----------------------------------------------------------------------------
+// -------------------------------------------------------------
+// HYBRID MULTI-MODEL ENGINE (DRIVE DOLPHIN ➔ GEMINI ➔ NVIDIA ➔ GROQ)
+// -------------------------------------------------------------
 async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
-  const isCoding = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
   const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
 
-  // 1. NVIDIA Nemotron (Coding & Deep Logic Priority)
-  if (isCoding && process.env.NVIDIA_API_KEY) {
-    try {
-      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-        messages: messages,
-        temperature: 0.4,
-        max_tokens: 2048
-      }, {
-        headers: { Authorization: `Bearer ${process.env.NVIDIA_API_KEY.trim()}` },
-        timeout: 15000
-      });
-      if (res.data?.choices?.[0]?.message?.content) {
-        return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
-      }
-    } catch (e) {
-      console.warn('[NVIDIA NEMOTRON FAIL] ➔ Switching to Primary:', e.message);
+  // Tier 1: Private Dolphin Llama 3.1 8B (From 5TB Google Drive on Colab)
+  const colabDriveUrl = process.env.DRIVE_MODEL_URL || 'https://lumina-flaxy-drive.loca.lt/v1/chat/completions';
+  try {
+    const driveRes = await axios.post(colabDriveUrl, {
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 1500
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
+      },
+      timeout: 20000
+    });
+
+    if (driveRes.data?.choices?.[0]?.message?.content) {
+      return { text: driveRes.data.choices[0].message.content, provider: 'private-drive-dolphin-8b' };
     }
+  } catch (e) {
+    // Colab offline hone par seamlessly Tier 2 par switch hoga
   }
 
-  // 2. Groq Llama 3.3 70B (Primary Ultra-Fast Chat)
-  if (process.env.GROQ_API_KEY) {
+  // Tier 2: Google Gemini 2.5 Flash
+  const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
+  if (geminiKey) {
     try {
-      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-        model: 'llama-3.3-70b-versatile',
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 1500
-      }, {
-        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY.trim()}` },
-        timeout: 10000
-      });
-      if (res.data?.choices?.[0]?.message?.content) {
-        return { text: res.data.choices[0].message.content, provider: 'groq (llama-3.3-70b)' };
-      }
-    } catch (e) {
-      console.warn('[GROQ API FAIL] ➔ Switching to Gemini:', e.message);
-    }
-  }
-
-  // 3. Google Gemini 2.5 Flash (Direct High-Speed Fallback)
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
       
       const res = await axios.post(geminiUrl, {
@@ -400,12 +332,48 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
       if (text) {
         return { text: text, provider: 'gemini-2.5-flash' };
       }
-    } catch (e) {
-      console.warn('[GEMINI 2.5 FAIL] ➔ Switching to Universal Fallback:', e.message);
-    }
+    } catch (e) {}
   }
 
-  // 4. Pollinations AI (100% Free Web LLM Fallback)
+  // Tier 3: NVIDIA Nemotron 70B (Coding & Complex Logic)
+  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
+  if (nvidiaKey) {
+    try {
+      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        messages: messages,
+        temperature: 0.4,
+        max_tokens: 2048
+      }, {
+        headers: { Authorization: `Bearer ${nvidiaKey}` },
+        timeout: 15000
+      });
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
+      }
+    } catch (e) {}
+  }
+
+  // Tier 4: Groq Llama 3.3 70B
+  const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
+  if (groqKey) {
+    try {
+      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1500
+      }, {
+        headers: { Authorization: `Bearer ${groqKey}` },
+        timeout: 10000
+      });
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'groq (llama-3.3-70b)' };
+      }
+    } catch (e) {}
+  }
+
+  // Tier 5: Pollinations AI & Smart Local Engine
   try {
     const polRes = await axios.post('https://text.pollinations.ai/', {
       messages: messages,
@@ -416,20 +384,17 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
     if (polRes.data && typeof polRes.data === 'string' && polRes.data.length > 5) {
       return { text: polRes.data, provider: 'pollinations_ai' };
     }
-  } catch (e) {
-    console.warn('[POLLINATIONS FAIL]:', e.message);
-  }
+  } catch (e) {}
 
-  // 5. Smart Local Persona Fallback
   return { 
     text: generateSmartLocalResponse(userPrompt, userMemory), 
     provider: 'lumina_smart_local' 
   };
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 6] MASTER QUERY PROCESSING & EXECUTION PIPELINE
-// ----------------------------------------------------------------------------
+// -------------------------------------------------------------
+// MAIN PROCESS QUERY PIPELINE
+// -------------------------------------------------------------
 async function processQuery(payload) {
   const prompt = payload.prompt || 'Hello';
   const provider = classifyRoute(payload);
@@ -440,7 +405,7 @@ async function processQuery(payload) {
   try {
     let result = null;
 
-    // 1. AI IMAGE GENERATION (FLUX ART ENGINE)
+    // 1. AI IMAGE GENERATION
     if (provider === 'image_generator') {
       const cleanPrompt = prompt.replace(/\b(lumina|image|photo|wallpaper|picture|banao|generate|create|draw|tasveer|ki|ek|ka|please)\b/gi, '').trim() || 'futuristic cyberpunk city neon';
       const encodedPrompt = encodeURIComponent(cleanPrompt);
@@ -457,7 +422,7 @@ async function processQuery(payload) {
       };
     }
 
-    // 2. DIRECT TELEGRAM DM TO ANOTHER USER
+    // 2. DIRECT TELEGRAM DM
     else if (provider === 'telegram_dm') {
       let detectedName = '';
       const mStr = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
@@ -801,7 +766,6 @@ CORE PERSONALITY RULES:
       result = { provider: llmResult.provider, text: llmResult.text, success: true };
     }
 
-    // Save action into Chat Memory
     chatMemory.push({ role: 'user', content: prompt });
     chatMemory.push({ role: 'assistant', content: result.text });
     if (chatMemory.length > 30) chatMemory.splice(1, 2);
@@ -814,9 +778,9 @@ CORE PERSONALITY RULES:
   }
 }
 
-// ----------------------------------------------------------------------------
-// [SECTION 7] 2-WAY TELEGRAM WEBHOOK HUB (@Ai_luminaa_bot)
-// ----------------------------------------------------------------------------
+// -------------------------------------------------------------
+// 2-WAY TELEGRAM WEBHOOK HUB (@Ai_luminaa_bot)
+// -------------------------------------------------------------
 app.post('/api/telegram-webhook', async (req, res) => {
   res.sendStatus(200);
 
@@ -830,14 +794,12 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
   const senderName = msg.from?.first_name || msg.from?.username || 'User';
 
-  // Save/Update Telegram User
   userMemory.telegramUsers[chatId] = {
     name: senderName,
     username: msg.from?.username || '',
     lastActive: new Date().toISOString()
   };
 
-  // Log user activity
   const timestamp = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
   if (msg.text) {
     userMemory.recentActivity.push(`${senderName} messaged "${msg.text}" at ${timestamp}`);
@@ -873,7 +835,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
       const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
       const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
 
-      // 1. Google Gemini 2.5 Flash Vision (Fixed camelCase inlineData)
       if (geminiKey) {
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
@@ -887,12 +848,9 @@ app.post('/api/telegram-webhook', async (req, res) => {
           }, { timeout: 20000 });
 
           visionAnswer = geminiVisionRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        } catch (geminiErr) {
-          console.warn('[GEMINI 2.5 VISION FAIL] ➔ Groq Vision Fallback:', geminiErr.message);
-        }
+        } catch (geminiErr) {}
       }
 
-      // 2. Groq Llama 3.2 Vision Fallback
       if (!visionAnswer && groqKey) {
         try {
           const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -962,7 +920,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const result = await processQuery({ prompt: userText, mode: 'telegram', chatId });
     const replyText = result.text || 'Done!';
 
-    // Send direct personal message to target Telegram user if triggered
     if (result.provider === 'telegram_dm' && result.targetChatId) {
       try {
         await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -977,7 +934,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
       text: replyText
     };
 
-    // Safe inline keyboard: ONLY HTTP/HTTPS URLs (Avoids Telegram 400 Bad Request on tel:)
     if (result.url && (result.url.startsWith('http://') || result.url.startsWith('https://'))) {
       telegramPayload.reply_markup = {
         inline_keyboard: [
@@ -1003,9 +959,6 @@ app.post('/api/telegram-webhook', async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// [SECTION 8] SYSTEM ENDPOINTS & WEB INTERFACES
-// ----------------------------------------------------------------------------
 app.get('/api/setup-telegram', async (req, res) => {
   const token = sanitizeApiKey(process.env.TELEGRAM_BOT_TOKEN);
   const host = req.get('host');
@@ -1026,12 +979,10 @@ app.get('/api/setup-telegram', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ 
   status: 'ONLINE', 
-  service: 'Lumina Mega AI Backend',
-  version: '6.0.0',
-  timestamp: new Date().toISOString(),
-  activeContacts: Object.keys(userMemory.contacts).length,
-  activeNotes: userMemory.notes.length,
-  registeredTelegramUsers: Object.keys(userMemory.telegramUsers).length
+  service: 'Lumina Mega AI Backend (Drive Edition)',
+  version: '6.5.0',
+  driveModelEndpoint: 'https://lumina-flaxy-drive.loca.lt',
+  timestamp: new Date().toISOString()
 }));
 
 app.post('/api/chat', async (req, res) => {
@@ -1048,16 +999,13 @@ app.post('/api/self-evolve', async (req, res) => {
   if (token && chatId) {
     if (delayMs > 0) {
       const mins = Math.max(1, Math.round(delayMs / 60000));
-      console.log(`[ALARM SCHEDULED]: Triggering Telegram alert after ${mins} minute(s) (${delayMs} ms).`);
       setTimeout(async () => {
         try {
           await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
             chat_id: chatId.trim(),
             text: `⏰ Reminder: ${mins} minute poore ho gaye!\n"${prompt}"`
           });
-        } catch (e) {
-          console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
-        }
+        } catch (e) {}
       }, delayMs);
 
       return res.json({
@@ -1084,6 +1032,6 @@ app.post('/api/self-evolve', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`========================================================`);
-  console.log(`🚀 Lumina Mega Backend Server v6.0 running on port ${PORT}`);
+  console.log(`🚀 Lumina Mega Backend Server (Drive Edition) on port ${PORT}`);
   console.log(`========================================================`);
 });
