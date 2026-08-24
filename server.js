@@ -1,15 +1,16 @@
 /**
  * ============================================================================
- * Lumina AI Assistant - Production Mega Architecture (v8.0 Vision Fixed)
+ * Lumina AI Assistant - Production Mega Architecture (v8.5 Bulletproof Vision)
  * Tailored for Flaxy (Nepanagar, MP, India)
  * ============================================================================
  * 
- * FIXES IN v8.0:
- *   - Fixed Gemini Vision 400 Error (extractPureBase64 sanitization)
- *   - Auto MIME-Type Detection (JPEG, PNG, WEBP)
- *   - Web UI & Telegram 100% Shared Vision AI
- *   - Human Voice NVIDIA Magpie TTS & Telegram Voice Notes
- *   - Private 5TB Google Drive Model Tier-1 Support
+ * CORE CAPABILITY SUITE:
+ *   - 3-Layer Vision Engine (Gemini 2.5 Flash ➔ Hugging Face Vision ➔ Pollinations)
+ *   - Universal Image Sanitizer (Clean Base64 parser for Telegram & Web UI)
+ *   - Human-like Neural Voice (NVIDIA Magpie Multilingual TTS & FastPitch)
+ *   - Tier 1: Private Dolphin Llama 3.1 8B (5TB Google Drive via Colab)
+ *   - AI Image Generation (FLUX High-Res Art Engine)
+ *   - Direct Telegram DMs, WhatsApp 1-on-1, Calling & Memory CRM
  * ============================================================================
  */
 
@@ -79,11 +80,11 @@ function sanitizeApiKey(key) {
 function extractPureBase64(img) {
   if (!img) return '';
   if (Array.isArray(img)) {
-    img = img || img[0] || '';
+    img = img[1] || img[0] || '';
   }
   if (typeof img === 'string') {
     if (img.includes(',')) {
-      return img.split(',').trim();
+      return img.split(',')[1].trim();
     }
     return img.trim();
   }
@@ -93,7 +94,7 @@ function extractPureBase64(img) {
 function extractMimeType(img) {
   if (typeof img === 'string' && img.startsWith('data:')) {
     const match = img.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
-    if (match) return match;
+    if (match) return match[1];
   }
   return 'image/jpeg';
 }
@@ -111,8 +112,8 @@ function extractCity(prompt = '') {
 
   const m = prompt.match(/(?:weather|mausam|temperature)(?:\s+in|\s+for|\s+of|\s+ka|\s+ki)?\s+([a-zA-Z]+)/i) ||
             prompt.match(/([a-zA-Z]+)\s+(?:ka|ki|me|main)\s+(?:weather|mausam)/i);
-  if (m && m) {
-    const candidate = m.replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
+  if (m && m[1]) {
+    const candidate = m[1].replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
     if (candidate.length >= 3) return candidate;
   }
   return userMemory.userProfile?.home?.split(',')[0] || 'Nepanagar';
@@ -121,16 +122,16 @@ function extractCity(prompt = '') {
 function extractContactName(prompt) {
   const p = prompt.toLowerCase();
   const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i);
-  if (m1 && m1 && m1.length >= 3) return m1;
+  if (m1 && m1[1] && m1[1].length >= 3) return m1[1];
 
   const m2 = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i);
-  if (m2 && m2 && m2.length >= 3) return m2;
+  if (m2 && m2[1] && m2[1].length >= 3) return m2[1];
 
   const m3 = p.match(/(?:dost|friend|bhai|bro)\s+([a-zA-Z]+)/i);
-  if (m3 && m3 && m3.length >= 3) return m3;
+  if (m3 && m3[1] && m3[1].length >= 3) return m3[1];
 
   const m4 = p.match(/(?:contact|save)\s+([a-zA-Z]+)/i);
-  if (m4 && m4 && m4.length >= 3) return m4;
+  if (m4 && m4[1] && m4[1].length >= 3) return m4[1];
 
   const stopWords = new Set([
     'ara', 'arre', 'ab', 'abhi', 'ma', 'main', 'mera', 'meri', 'mere', 'uska', 'uski', 'usko', 'iska', 'iski', 'isko', 
@@ -150,8 +151,8 @@ function extractAndSaveUserFacts(prompt) {
   let updated = false;
 
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
-  if (nameMatch && nameMatch) {
-    const extractedName = nameMatch.trim();
+  if (nameMatch && nameMatch[1]) {
+    const extractedName = nameMatch[1].trim();
     userMemory.userProfile.name = extractedName;
     if (!userMemory.facts.includes(`User name: ${extractedName}`)) {
       userMemory.facts.push(`User name: ${extractedName}`);
@@ -160,8 +161,8 @@ function extractAndSaveUserFacts(prompt) {
   }
 
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
-  if (homeMatch && homeMatch) {
-    const extractedHome = homeMatch.trim();
+  if (homeMatch && homeMatch[1]) {
+    const extractedHome = homeMatch[1].trim();
     userMemory.userProfile.home = extractedHome;
     if (!userMemory.facts.includes(`User home: ${extractedHome}`)) {
       userMemory.facts.push(`User home: ${extractedHome}`);
@@ -187,8 +188,8 @@ function extractAndSaveUserFacts(prompt) {
   }
 
   const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
-  if (rememberMatch && rememberMatch) {
-    const fact = rememberMatch.trim();
+  if (rememberMatch && rememberMatch[1]) {
+    const fact = rememberMatch[1].trim();
     if (fact && !userMemory.facts.includes(fact)) {
       userMemory.facts.push(fact);
       updated = true;
@@ -201,8 +202,8 @@ function extractAndSaveUserFacts(prompt) {
 function parseDelayMs(prompt = '') {
   let delayMinutes = 0;
   const m = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i);
-  if (m && m) {
-    const num = parseInt(m, 10);
+  if (m && m[1]) {
+    const num = parseInt(m[1], 10);
     const lower = prompt.toLowerCase();
     if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
     else if (lower.includes('sec')) delayMinutes = num / 60;
@@ -303,21 +304,22 @@ function generateSmartLocalResponse(prompt, memory) {
 }
 
 // -------------------------------------------------------------
-// DEDICATED ROBUST VISION AI ENGINE (100% PROVEN FORMAT)
+// 3-LAYER ZERO-FAIL VISION AI ENGINE
 // -------------------------------------------------------------
 async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke short aur smart answer do.') {
   const pureBase64 = extractPureBase64(base64Image);
   const mimeType = extractMimeType(base64Image);
   const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
+  const hfKey = sanitizeApiKey(process.env.HF_API_KEY);
   const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
 
   if (!pureBase64) {
     return { text: `Photo data empty ya corrupt hai. Kripya image dobara attach karein.`, provider: 'vision-error' };
   }
 
-  // 1. Google Gemini 2.5 Flash / 3.7 Flash Vision
+  // Layer 1: Google Gemini Vision Models (2.5 Flash, 1.5 Flash, 3.7 Flash)
   if (geminiKey) {
-    const visionModels = ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
+    const visionModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash-lite'];
     for (const model of visionModels) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
@@ -343,7 +345,35 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
     }
   }
 
-  // 2. Groq Llama 3.2 Vision Fallback
+  // Layer 2: Hugging Face Serverless Vision API (Qwen2-VL-7B)
+  if (hfKey) {
+    try {
+      const hfRes = await axios.post('https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct/v1/chat/completions', {
+        model: 'Qwen/Qwen2-VL-7B-Instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: `You are Lumina AI. Analyze this image in first-person in natural Romanized Hinglish: ${caption}` },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${pureBase64}` } }
+            ]
+          }
+        ],
+        max_tokens: 1024
+      }, {
+        headers: { Authorization: `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
+        timeout: 25000
+      });
+
+      if (hfRes.data?.choices?.[0]?.message?.content) {
+        return { text: hfRes.data.choices[0].message.content, provider: 'huggingface-vision (qwen2-vl)' };
+      }
+    } catch (hfErr) {
+      console.warn('[HF VISION FAIL] ➔', hfErr.message);
+    }
+  }
+
+  // Layer 3: Groq Llama 3.2 Vision Fallback
   if (groqKey) {
     try {
       const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -360,7 +390,7 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
         temperature: 0.6,
         max_tokens: 1024
       }, {
-        headers: { Authorization: `Bearer ${groqKey}` },
+        headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
         timeout: 20000
       });
 
@@ -405,7 +435,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
   // Tier 2: Google Gemini Frontier Models
   const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
   if (geminiKey) {
-    const textModels = ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
+    const textModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash-lite'];
     for (const model of textModels) {
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
@@ -521,7 +551,7 @@ async function processQuery(payload) {
       let detectedName = '';
       const mStr = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
                     prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
-      if (mStr && mStr) detectedName = mStr;
+      if (mStr && mStr[1]) detectedName = mStr[1];
 
       const resolved = await resolveTelegramUser(detectedName || prompt, token);
 
@@ -889,7 +919,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS
+  // A. HANDLE INCOMING PHOTOS (FRONTIER VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
@@ -1010,9 +1040,9 @@ app.get('/api/setup-telegram', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ 
   status: 'ONLINE', 
-  service: 'Lumina Mega AI Backend (v8.0 Vision Fixed)',
-  version: '8.0.0',
-  visionModel: 'Gemini 2.5 Flash / Gemini 3.7 Flash',
+  service: 'Lumina Mega AI Backend (v8.5 Bulletproof Vision)',
+  version: '8.5.0',
+  visionModel: 'Gemini 2.5 Flash / Hugging Face Qwen2-VL',
   driveModelEndpoint: process.env.DRIVE_MODEL_URL || 'https://lumina-flaxy-drive.loca.lt',
   timestamp: new Date().toISOString()
 }));
@@ -1064,6 +1094,6 @@ app.post('/api/self-evolve', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`========================================================`);
-  console.log(`🚀 Lumina Mega Backend Server (v8.0 Vision Fixed) on port ${PORT}`);
+  console.log(`🚀 Lumina Mega Backend Server (v8.5 Vision) on port ${PORT}`);
   console.log(`========================================================`);
 });
