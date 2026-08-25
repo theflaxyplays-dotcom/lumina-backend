@@ -1,15 +1,17 @@
 /**
  * ============================================================================
- * Lumina AI Assistant - Production Mega Architecture (v8.5 Bulletproof Vision)
+ * Lumina AI Assistant - Production Mega Architecture (v9.5 NVIDIA Vision Edition)
  * Tailored for Flaxy (Nepanagar, MP, India)
  * ============================================================================
  * 
  * CORE CAPABILITY SUITE:
- *   - 3-Layer Vision Engine (Gemini 2.5 Flash ➔ Hugging Face Vision ➔ Pollinations)
- *   - Universal Image Sanitizer (Clean Base64 parser for Telegram & Web UI)
- *   - Human-like Neural Voice (NVIDIA Magpie Multilingual TTS & FastPitch)
- *   - Tier 1: Private Dolphin Llama 3.1 8B (5TB Google Drive via Colab)
- *   - AI Image Generation (FLUX High-Res Art Engine)
+ *   - Primary Chat: OpenAI GPT-OSS 120B on Groq (~500 TPS Flagship Brain)
+ *   - Primary Vision: NVIDIA Vision AI + Hugging Face Qwen2-VL (No Gemini Dependency)
+ *   - Coding Engine: NVIDIA Nemotron 70B
+ *   - Private Cloud Brain: Dolphin Llama 3.1 8B (5TB Google Drive via Colab)
+ *   - Human-like Neural Voice: NVIDIA Magpie Multilingual TTS
+ *   - AI Image Generation: FLUX High-Res Art Engine
+ *   - 2-Way Interactive Telegram Webhook Hub (@Ai_luminaa_bot)
  *   - Direct Telegram DMs, WhatsApp 1-on-1, Calling & Memory CRM
  * ============================================================================
  */
@@ -80,11 +82,11 @@ function sanitizeApiKey(key) {
 function extractPureBase64(img) {
   if (!img) return '';
   if (Array.isArray(img)) {
-    img = img[1] || img[0] || '';
+    img = img || img[0] || '';
   }
   if (typeof img === 'string') {
     if (img.includes(',')) {
-      return img.split(',')[1].trim();
+      return img.split(',').trim();
     }
     return img.trim();
   }
@@ -94,7 +96,7 @@ function extractPureBase64(img) {
 function extractMimeType(img) {
   if (typeof img === 'string' && img.startsWith('data:')) {
     const match = img.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
-    if (match) return match[1];
+    if (match) return match;
   }
   return 'image/jpeg';
 }
@@ -112,8 +114,8 @@ function extractCity(prompt = '') {
 
   const m = prompt.match(/(?:weather|mausam|temperature)(?:\s+in|\s+for|\s+of|\s+ka|\s+ki)?\s+([a-zA-Z]+)/i) ||
             prompt.match(/([a-zA-Z]+)\s+(?:ka|ki|me|main)\s+(?:weather|mausam)/i);
-  if (m && m[1]) {
-    const candidate = m[1].replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
+  if (m && m) {
+    const candidate = m.replace(/\b(kaisa|hai|h|batao|aaj|today|ka|ki|me)\b/gi, '').trim();
     if (candidate.length >= 3) return candidate;
   }
   return userMemory.userProfile?.home?.split(',')[0] || 'Nepanagar';
@@ -122,16 +124,16 @@ function extractCity(prompt = '') {
 function extractContactName(prompt) {
   const p = prompt.toLowerCase();
   const m1 = p.match(/([a-zA-Z]+)\s+(?:mara|mera|ka|ki|ke)\s+(?:dost|friend|bhai|bro)/i);
-  if (m1 && m1[1] && m1[1].length >= 3) return m1[1];
+  if (m1 && m1 && m1.length >= 3) return m1;
 
   const m2 = p.match(/([a-zA-Z]+)\s+(?:ka|ki|ke)\s+number/i);
-  if (m2 && m2[1] && m2[1].length >= 3) return m2[1];
+  if (m2 && m2 && m2.length >= 3) return m2;
 
   const m3 = p.match(/(?:dost|friend|bhai|bro)\s+([a-zA-Z]+)/i);
-  if (m3 && m3[1] && m3[1].length >= 3) return m3[1];
+  if (m3 && m3 && m3.length >= 3) return m3;
 
   const m4 = p.match(/(?:contact|save)\s+([a-zA-Z]+)/i);
-  if (m4 && m4[1] && m4[1].length >= 3) return m4[1];
+  if (m4 && m4 && m4.length >= 3) return m4;
 
   const stopWords = new Set([
     'ara', 'arre', 'ab', 'abhi', 'ma', 'main', 'mera', 'meri', 'mere', 'uska', 'uski', 'usko', 'iska', 'iski', 'isko', 
@@ -151,8 +153,8 @@ function extractAndSaveUserFacts(prompt) {
   let updated = false;
 
   const nameMatch = prompt.match(/mera naam ([a-zA-Z\s]+) (?:hai|h)/i) || prompt.match(/my name is ([a-zA-Z\s]+)/i);
-  if (nameMatch && nameMatch[1]) {
-    const extractedName = nameMatch[1].trim();
+  if (nameMatch && nameMatch) {
+    const extractedName = nameMatch.trim();
     userMemory.userProfile.name = extractedName;
     if (!userMemory.facts.includes(`User name: ${extractedName}`)) {
       userMemory.facts.push(`User name: ${extractedName}`);
@@ -161,8 +163,8 @@ function extractAndSaveUserFacts(prompt) {
   }
 
   const homeMatch = prompt.match(/mera ghar ([a-zA-Z\s]+) (?:me|main|par) (?:hai|h)/i) || prompt.match(/i live in ([a-zA-Z\s]+)/i);
-  if (homeMatch && homeMatch[1]) {
-    const extractedHome = homeMatch[1].trim();
+  if (homeMatch && homeMatch) {
+    const extractedHome = homeMatch.trim();
     userMemory.userProfile.home = extractedHome;
     if (!userMemory.facts.includes(`User home: ${extractedHome}`)) {
       userMemory.facts.push(`User home: ${extractedHome}`);
@@ -188,8 +190,8 @@ function extractAndSaveUserFacts(prompt) {
   }
 
   const rememberMatch = prompt.match(/(?:yaad rakhna|remember that|save that|yaad rakho)(?:\s+ki)?\s+(.+)/i);
-  if (rememberMatch && rememberMatch[1]) {
-    const fact = rememberMatch[1].trim();
+  if (rememberMatch && rememberMatch) {
+    const fact = rememberMatch.trim();
     if (fact && !userMemory.facts.includes(fact)) {
       userMemory.facts.push(fact);
       updated = true;
@@ -202,8 +204,8 @@ function extractAndSaveUserFacts(prompt) {
 function parseDelayMs(prompt = '') {
   let delayMinutes = 0;
   const m = prompt.match(/(\d+)\s*(?:minute|minutes|min|mins|sec|seconds|hour|hours|ghante)/i);
-  if (m && m[1]) {
-    const num = parseInt(m[1], 10);
+  if (m && m) {
+    const num = parseInt(m, 10);
     const lower = prompt.toLowerCase();
     if (lower.includes('hour') || lower.includes('ghante')) delayMinutes = num * 60;
     else if (lower.includes('sec')) delayMinutes = num / 60;
@@ -304,12 +306,12 @@ function generateSmartLocalResponse(prompt, memory) {
 }
 
 // -------------------------------------------------------------
-// 3-LAYER ZERO-FAIL VISION AI ENGINE
+// PRIMARY NVIDIA & HUGGING FACE VISION ENGINE (NO GEMINI DEPENDENCY)
 // -------------------------------------------------------------
 async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke short aur smart answer do.') {
   const pureBase64 = extractPureBase64(base64Image);
   const mimeType = extractMimeType(base64Image);
-  const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
+  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
   const hfKey = sanitizeApiKey(process.env.HF_API_KEY);
   const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
 
@@ -317,35 +319,41 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
     return { text: `Photo data empty ya corrupt hai. Kripya image dobara attach karein.`, provider: 'vision-error' };
   }
 
-  // Layer 1: Google Gemini Vision Models (2.5 Flash, 1.5 Flash, 3.7 Flash)
-  if (geminiKey) {
-    const visionModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash-lite'];
-    for (const model of visionModels) {
+  // Layer 1: NVIDIA Frontier Vision AI (meta/llama-3.2-11b-vision-instruct / nemotron-nano-vl)
+  if (nvidiaKey) {
+    const nvidiaVisionModels = ['meta/llama-3.2-11b-vision-instruct', 'nvidia/nemotron-nano-12b-2-vl', 'nvidia/neva-22b'];
+    for (const model of nvidiaVisionModels) {
       try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-        const res = await axios.post(geminiUrl, {
-          contents: [{
-            parts: [
-              { text: `You are Lumina AI (Flaxy's personal assistant, avatar: Lumine from Genshin Impact). Analyze this image and respond warmly, smartly, and accurately in first-person ("Main", "Meri profile/chat") in natural Romanized Hinglish (English alphabet). User query: ${caption}` },
-              { inlineData: { mimeType: mimeType, data: pureBase64 } }
-            ]
-          }]
-        }, { 
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 25000 
+        const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: `You are Lumina AI (Flaxy's personal assistant, avatar: Lumine from Genshin Impact). Analyze this image and respond in first-person ("Main", "Meri profile/chat") in natural Romanized Hinglish: ${caption}` },
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${pureBase64}` } }
+              ]
+            }
+          ],
+          max_tokens: 1024
+        }, {
+          headers: {
+            Authorization: `Bearer ${nvidiaKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 25000
         });
 
-        const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return { text: text, provider: `gemini-vision (${model})` };
+        if (res.data?.choices?.[0]?.message?.content) {
+          return { text: res.data.choices[0].message.content, provider: `nvidia-vision (${model})` };
         }
       } catch (e) {
-        console.warn(`[GEMINI VISION ${model} FAIL] ➔ ${e.message}`);
+        console.warn(`[NVIDIA VISION ${model} NOTE] ➔ ${e.message}`);
       }
     }
   }
 
-  // Layer 2: Hugging Face Serverless Vision API (Qwen2-VL-7B)
+  // Layer 2: Hugging Face Serverless Vision (Qwen2-VL-7B)
   if (hfKey) {
     try {
       const hfRes = await axios.post('https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct/v1/chat/completions', {
@@ -354,7 +362,7 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
           {
             role: 'user',
             content: [
-              { type: 'text', text: `You are Lumina AI. Analyze this image in first-person in natural Romanized Hinglish: ${caption}` },
+              { type: 'text', text: `You are Lumina AI. Analyze this image in natural Romanized Hinglish: ${caption}` },
               { type: 'image_url', image_url: { url: `data:${mimeType};base64,${pureBase64}` } }
             ]
           }
@@ -369,11 +377,11 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
         return { text: hfRes.data.choices[0].message.content, provider: 'huggingface-vision (qwen2-vl)' };
       }
     } catch (hfErr) {
-      console.warn('[HF VISION FAIL] ➔', hfErr.message);
+      console.warn('[HF VISION NOTE] ➔', hfErr.message);
     }
   }
 
-  // Layer 3: Groq Llama 3.2 Vision Fallback
+  // Layer 3: Groq Vision (llama-3.2-11b-vision-preview)
   if (groqKey) {
     try {
       const groqVisionRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -382,7 +390,7 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
           {
             role: 'user',
             content: [
-              { type: 'text', text: `You are Lumina AI. Analyze this image in first-person in natural Romanized Hinglish. User query: ${caption}` },
+              { type: 'text', text: `You are Lumina AI. Analyze this image in natural Romanized Hinglish: ${caption}` },
               { type: 'image_url', image_url: { url: `data:${mimeType};base64,${pureBase64}` } }
             ]
           }
@@ -397,22 +405,63 @@ async function runVisionAI(base64Image, caption = 'Is photo ko analyze karke sho
       if (groqVisionRes.data?.choices?.[0]?.message?.content) {
         return { text: groqVisionRes.data.choices[0].message.content, provider: 'groq-vision' };
       }
-    } catch (groqErr) {
-      console.warn('[GROQ VISION FAIL] ➔', groqErr.message);
-    }
+    } catch (groqErr) {}
   }
 
   return { text: `Photo receive ho gayi hai lekin visual analysis generate nahi ho paya. Kripya image dobara attach karein.`, provider: 'vision-error' };
 }
 
 // -------------------------------------------------------------
-// HYBRID MULTI-MODEL ENGINE
+// PRIMARY CHAT: OPENAI GPT-OSS 120B (~500 TPS) ➔ NVIDIA ➔ DRIVE
 // -------------------------------------------------------------
 async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
   const isCoding = /\b(code|coding|script|debug|function|algorithm|error|fix|logic|math|calculate|reasoning|program|architecture|regex|query|database|sql|json|api|backend|frontend|html|css|js|python|java|cpp)\b/i.test(userPrompt);
   const messages = [systemMsg, ...history.slice(-10), { role: 'user', content: userPrompt }];
 
-  // Tier 1: Private Dolphin Llama 3.1 8B (5TB Google Drive via Colab)
+  // Tier 1: OpenAI GPT-OSS 120B & Llama 3.3 on Groq LPUs (~500 TPS)
+  const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
+  if (groqKey) {
+    const groqModels = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    for (const model of groqModels) {
+      try {
+        const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+          model: model,
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 1500
+        }, {
+          headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+          timeout: 10000
+        });
+        if (res.data?.choices?.[0]?.message?.content) {
+          return { text: res.data.choices[0].message.content, provider: `chatgpt-groq (${model})` };
+        }
+      } catch (e) {
+        console.warn(`[GROQ ${model} NOTE] ➔ ${e.message}`);
+      }
+    }
+  }
+
+  // Tier 2: NVIDIA Nemotron 70B (High-Precision Coding & Reasoning)
+  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
+  if (nvidiaKey) {
+    try {
+      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        messages: messages,
+        temperature: 0.4,
+        max_tokens: 2048
+      }, {
+        headers: { Authorization: `Bearer ${nvidiaKey}`, 'Content-Type': 'application/json' },
+        timeout: 15000
+      });
+      if (res.data?.choices?.[0]?.message?.content) {
+        return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
+      }
+    } catch (e) {}
+  }
+
+  // Tier 3: Private Dolphin Llama 3.1 8B (5TB Google Drive on Colab)
   const colabDriveUrl = process.env.DRIVE_MODEL_URL || 'https://lumina-flaxy-drive.loca.lt/v1/chat/completions';
   try {
     const driveRes = await axios.post(colabDriveUrl, {
@@ -424,7 +473,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
         'Content-Type': 'application/json',
         'Bypass-Tunnel-Reminder': 'true'
       },
-      timeout: 18000
+      timeout: 15000
     });
 
     if (driveRes.data?.choices?.[0]?.message?.content) {
@@ -432,66 +481,7 @@ async function queryLLMWithFallback(systemMsg, userPrompt, history = []) {
     }
   } catch (e) {}
 
-  // Tier 2: Google Gemini Frontier Models
-  const geminiKey = sanitizeApiKey(process.env.GEMINI_API_KEY);
-  if (geminiKey) {
-    const textModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash-lite'];
-    for (const model of textModels) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-        const geminiPrompt = `${systemMsg.content}\n\nUser: ${userPrompt}`;
-        
-        const res = await axios.post(geminiUrl, {
-          contents: [{ parts: [{ text: geminiPrompt }] }]
-        }, { timeout: 18000 });
-
-        const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return { text: text, provider: `gemini (${model})` };
-        }
-      } catch (e) {}
-    }
-  }
-
-  // Tier 3: NVIDIA Nemotron 70B (Coding & Complex Logic)
-  const nvidiaKey = sanitizeApiKey(process.env.NVIDIA_API_KEY);
-  if (nvidiaKey) {
-    try {
-      const res = await axios.post('https://integrate.api.nvidia.com/v1/chat/completions', {
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-        messages: messages,
-        temperature: 0.4,
-        max_tokens: 2048
-      }, {
-        headers: { Authorization: `Bearer ${nvidiaKey}` },
-        timeout: 15000
-      });
-      if (res.data?.choices?.[0]?.message?.content) {
-        return { text: res.data.choices[0].message.content, provider: 'nvidia-nemotron' };
-      }
-    } catch (e) {}
-  }
-
-  // Tier 4: Groq Llama 3.3 70B
-  const groqKey = sanitizeApiKey(process.env.GROQ_API_KEY);
-  if (groqKey) {
-    try {
-      const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-        model: 'llama-3.3-70b-versatile',
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 1500
-      }, {
-        headers: { Authorization: `Bearer ${groqKey}` },
-        timeout: 10000
-      });
-      if (res.data?.choices?.[0]?.message?.content) {
-        return { text: res.data.choices[0].message.content, provider: 'groq (llama-3.3-70b)' };
-      }
-    } catch (e) {}
-  }
-
-  // Tier 5: Pollinations AI & Smart Local Engine
+  // Tier 4: Pollinations AI & Smart Local Engine
   try {
     const polRes = await axios.post('https://text.pollinations.ai/', {
       messages: messages,
@@ -551,7 +541,7 @@ async function processQuery(payload) {
       let detectedName = '';
       const mStr = prompt.match(/([a-zA-Z]+)\s+(?:ko|par|per|pe)\s+(?:telegram|tele)/i) ||
                     prompt.match(/(?:telegram|tele)\s+(?:par|per|pe)\s+([a-zA-Z]+)\s+ko/i);
-      if (mStr && mStr[1]) detectedName = mStr[1];
+      if (mStr && mStr) detectedName = mStr;
 
       const resolved = await resolveTelegramUser(detectedName || prompt, token);
 
@@ -919,7 +909,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (userMemory.recentActivity.length > 20) userMemory.recentActivity.shift();
   saveUserMemory(userMemory);
 
-  // A. HANDLE INCOMING PHOTOS (FRONTIER VISION)
+  // A. HANDLE INCOMING PHOTOS (PRIMARY NVIDIA & HF VISION)
   if (msg.photo && msg.photo.length > 0) {
     const highestPhoto = msg.photo[msg.photo.length - 1];
     const caption = msg.caption || 'Is photo ko analyze karke short aur smart first-person answer do.';
@@ -967,7 +957,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
   if (!userText) return;
 
   if (userText === '/start') {
-    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, photo scanning, notes, live search aur phone actions sab handle kar sakti hoon. Bataiye kya help karun?`;
+    const welcomeMsg = `Namaste ${senderName}! 👋\n\nMain Lumina hoon—aapka personal AI assistant. Main coding, OpenAI GPT-OSS 120B reasoning, NVIDIA vision scanning, notes aur phone actions sab handle kar sakti hoon. Bataiye kya help karun?`;
     try {
       await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
@@ -1040,10 +1030,10 @@ app.get('/api/setup-telegram', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ 
   status: 'ONLINE', 
-  service: 'Lumina Mega AI Backend (v8.5 Bulletproof Vision)',
-  version: '8.5.0',
-  visionModel: 'Gemini 2.5 Flash / Hugging Face Qwen2-VL',
-  driveModelEndpoint: process.env.DRIVE_MODEL_URL || 'https://lumina-flaxy-drive.loca.lt',
+  service: 'Lumina Mega AI Backend (v9.5 NVIDIA Vision Edition)',
+  version: '9.5.0',
+  chatBrain: 'OpenAI GPT-OSS 120B on Groq (~500 TPS)',
+  visionEngine: 'NVIDIA Vision AI (meta/llama-3.2-11b-vision) + Hugging Face Qwen2-VL',
   timestamp: new Date().toISOString()
 }));
 
@@ -1067,7 +1057,9 @@ app.post('/api/self-evolve', async (req, res) => {
             chat_id: chatId.trim(),
             text: `⏰ Reminder: ${mins} minute poore ho gaye!\n"${prompt}"`
           });
-        } catch (e) {}
+        } catch (e) {
+          console.error('[TELEGRAM ALARM SEND ERROR]', e.message);
+        }
       }, delayMs);
 
       return res.json({
@@ -1094,6 +1086,6 @@ app.post('/api/self-evolve', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`========================================================`);
-  console.log(`🚀 Lumina Mega Backend Server (v8.5 Vision) on port ${PORT}`);
+  console.log(`🚀 Lumina Mega Backend Server (v9.5 NVIDIA Vision) on port ${PORT}`);
   console.log(`========================================================`);
 });
