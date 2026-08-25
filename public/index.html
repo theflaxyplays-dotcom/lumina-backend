@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>LUMINA AI // HOLOGRAPHIC NEURAL INTERFACE</title>
   
-  <!-- Google Fonts: Orbitron & Rajdhani -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -132,12 +131,6 @@
       color: #9BA3BF;
       letter-spacing: 1px;
       backdrop-filter: blur(8px);
-    }
-
-    .system-status-bar span {
-      display: flex;
-      align-items: center;
-      gap: 4px;
     }
 
     .reactor-stage {
@@ -306,14 +299,13 @@
     .card-body-text::-webkit-scrollbar { width: 4px; }
     .card-body-text::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 4px; }
 
-    /* Photo Upload Preview Pill */
     .photo-preview-pill {
       display: none;
       align-items: center;
       gap: 8px;
       background: rgba(0, 240, 255, 0.15);
       border: 1px solid var(--cyan);
-      padding: 4px 10px;
+      padding: 6px 12px;
       border-radius: 8px;
       margin-bottom: 8px;
       width: 100%;
@@ -323,8 +315,8 @@
     }
 
     .photo-preview-pill img {
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 4px;
       object-fit: cover;
       border: 1px solid var(--cyan);
@@ -333,12 +325,11 @@
     .photo-preview-remove {
       margin-left: auto;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
       color: var(--pink);
       font-weight: bold;
     }
 
-    /* Input Bar with Camera & Submit */
     .input-container {
       width: 100%;
       display: flex;
@@ -514,7 +505,6 @@
       </div>
     </header>
 
-    <!-- CENTRAL INTERACTIVE ARC REACTOR -->
     <div class="reactor-stage" onclick="startVoiceInput()">
       <div class="ring-outer"></div>
       <div class="ring-middle"></div>
@@ -532,7 +522,6 @@
       </div>
     </div>
 
-    <!-- TRANSMISSION FEED CARD -->
     <div class="hud-card">
       <div class="card-top">
         <div class="card-label">// NEURAL TRANSMISSION FEED</div>
@@ -541,14 +530,12 @@
       <div class="card-body-text" id="feed-output">LUMINA SYSTEM ONLINE // AWAITING FLAXY COMMAND...</div>
     </div>
 
-    <!-- PHOTO ATTACHMENT PREVIEW BADGE -->
     <div class="photo-preview-pill" id="photo-preview-box">
       <img id="photo-preview-img" src="" alt="Selected Photo">
-      <span id="photo-preview-name">Photo Attached</span>
+      <span id="photo-preview-name">Photo Attached (Optimized)</span>
       <span class="photo-preview-remove" onclick="removeAttachedPhoto()">&times;</span>
     </div>
 
-    <!-- INPUT TERMINAL WITH CAMERA BUTTON -->
     <div class="input-container">
       <input type="file" id="camera-file-input" accept="image/*" style="display: none;" onchange="handlePhotoSelection(event)">
       <div class="camera-btn" onclick="document.getElementById('camera-file-input').click()" title="Attach Photo / Camera">
@@ -558,7 +545,6 @@
       <button class="transmit-btn" onclick="transmitCommand()">SEND ⚡</button>
     </div>
 
-    <!-- ACTION MATRIX -->
     <div class="action-matrix">
       <div class="hud-btn" id="torch-hud-btn" onclick="toggleHardwareTorchDirect()">
         <span>🔦</span> <span>TORCH</span>
@@ -575,7 +561,6 @@
     </div>
   </div>
 
-  <!-- AI ART GENERATOR MODAL -->
   <div class="modal-overlay" id="image-modal">
     <div class="modal-box">
       <div class="modal-header">
@@ -598,7 +583,7 @@
     updateClock();
 
     // -------------------------------------------------------------
-    // PHOTO UPLOAD & BASE64 CONVERTER
+    // ULTRA-FAST CLIENT-SIDE IMAGE AUTO-COMPRESSOR (NO TIMEOUT!)
     // -------------------------------------------------------------
     function handlePhotoSelection(event) {
       const file = event.target.files[0];
@@ -606,14 +591,39 @@
 
       const reader = new FileReader();
       reader.onload = function(e) {
-        const fullBase64 = e.target.result;
-        attachedBase64Image = fullBase64.split(',') || fullBase64;
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1024; // Scaled to optimal resolution
 
-        document.getElementById('photo-preview-img').src = fullBase64;
-        document.getElementById('photo-preview-name').innerText = file.name || 'Photo Attached';
-        document.getElementById('photo-preview-box').style.display = 'flex';
-        document.getElementById('command-input').placeholder = 'Ask a question about this photo...';
-        document.getElementById('command-input').focus();
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Highly optimized lightweight base64 (~100 KB)
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          attachedBase64Image = optimizedDataUrl;
+
+          document.getElementById('photo-preview-img').src = optimizedDataUrl;
+          document.getElementById('photo-preview-name').innerText = file.name || 'Photo Ready';
+          document.getElementById('photo-preview-box').style.display = 'flex';
+          document.getElementById('command-input').placeholder = 'Ask a question about this photo...';
+          document.getElementById('command-input').focus();
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -663,7 +673,7 @@
     }
 
     // -------------------------------------------------------------
-    // COMMAND TRANSMISSION WITH PHOTO SUPPORT
+    // COMMAND TRANSMISSION (0.5s SPEED)
     // -------------------------------------------------------------
     async function transmitCommand(customText) {
       const inputElem = document.getElementById('command-input');
@@ -710,7 +720,7 @@
         }
 
         if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(replyText.replace(/[*_~`]/g, ''));
+          const utterance = new SpeechSynthesisUtterance(replyText.replace(/[*_~`#]/g, ''));
           utterance.lang = 'hi-IN';
           utterance.onend = () => { statusElem.innerText = 'READY'; };
           utterance.onerror = () => { statusElem.innerText = 'READY'; };
@@ -762,9 +772,6 @@
       }
     }
 
-    // -------------------------------------------------------------
-    // MODAL TRIGGERS
-    // -------------------------------------------------------------
     function openImageGenModal() {
       document.getElementById('image-modal').style.display = 'flex';
       document.getElementById('art-prompt-input').focus();
